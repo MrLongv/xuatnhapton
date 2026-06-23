@@ -181,3 +181,9 @@ tbody tr:hover { background: #fffbf4; }
   .toast-host { left: 12px; right: 12px; top: 12px; }
   .toast { min-width: 0; max-width: none; }
 }
+
+
+/* Bản chạy thực tế: bỏ tab setup, login gọn hơn */
+.login-card .form-help { margin: 0; line-height: 1.45; }
+.auth-form .ghost.full { margin-top: -4px; }
+.nav-item.hidden, .admin-only.hidden, .admin-staff.hidden { display: none !important; }
