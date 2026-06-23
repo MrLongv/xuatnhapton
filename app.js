@@ -9,7 +9,7 @@ const STORAGE = {
 };
 
 const API_BASE = "https://xuat-nhap-ton-api.lequangthuan1988.workers.dev";
-const APP_VERSION = "20260623-official-v2";
+const APP_VERSION = "20260623-sltn-v3";
 const PAGE_LIMIT = 50;
 const IMPORT_BATCH_SIZE = 500;
 
@@ -308,6 +308,9 @@ function bindProducts() {
         item_group: $("productGroup").value.trim(),
         note: $("productNote").value.trim(),
         is_active: $("productActive").value === "1",
+        sltn_total: nullableNumber($("productSltnTotal").value) || 0,
+        sltn_sl: nullableNumber($("productSltnSl").value) || 0,
+        sltn_mau: nullableNumber($("productSltnMau").value) || 0,
       };
       if (id) await api(`/api/products/${encodeURIComponent(id)}`, { method: "PUT", body: payload });
       else await api("/api/products", { method: "POST", body: payload });
@@ -325,9 +328,10 @@ async function loadProducts() {
       <tr>
         <td><strong>${esc(r.product_code)}</strong></td><td>${esc(r.product_name)}</td><td>${esc(r.unit)}</td>
         <td>${esc(r.customer_name)}</td><td>${esc(r.item_group)}</td>
+        <td class="num strong">${fmt(r.sltn_total)}</td><td class="num">${fmt(r.sltn_sl)}</td><td class="num">${fmt(r.sltn_mau)}</td>
         <td><span class="badge ${r.is_active ? "success" : "danger"}">${r.is_active ? "Active" : "Ngưng"}</span></td>
         <td class="right"><button class="tiny" data-edit-product='${attrJson(r)}'>Sửa</button></td>
-      </tr>`).join("") || emptyRow(7);
+      </tr>`).join("") || emptyRow(10);
     $("productsPage").textContent = data.page;
     setPagerState("products", data);
     $$('[data-edit-product]').forEach((btn) => btn.addEventListener("click", () => openProductDialog(safeJson(btn.dataset.editProduct))));
@@ -340,6 +344,9 @@ function openProductDialog(r = null) {
   $("productCode").value = r?.product_code || "";
   $("productName").value = r?.product_name || "";
   $("productUnit").value = r?.unit || "PCS";
+  $("productSltnTotal").value = r?.sltn_total ?? 0;
+  $("productSltnSl").value = r?.sltn_sl ?? 0;
+  $("productSltnMau").value = r?.sltn_mau ?? 0;
   $("productCustomer").value = r?.customer_name || "";
   $("productGroup").value = r?.item_group || "";
   $("productNote").value = r?.note || "";
@@ -605,8 +612,8 @@ async function previewExcel() {
     state.excelRows = rows;
     state.lastRows.excelPreview = rows.slice(0, 200);
     $("excelPreviewTbody").innerHTML = rows.slice(0, 200).map((r) => `<tr>
-      <td>${esc(r.source_sheet)}</td><td>${esc(r.source_row)}</td><td>${esc(r.doc_date)}</td><td><strong>${esc(r.product_code)}</strong></td>
-      <td>${esc(r.product_name)}</td><td class="num">${fmt(r.qty_total)}</td><td>${esc(r.description)}</td>
+      <td>${esc(r.source_sheet)}</td><td>${esc(r.source_row)}</td><td>${esc(r.doc_date || "")}</td><td><strong>${esc(r.product_code)}</strong></td>
+      <td>${esc(r.product_name)}</td><td class="num">${fmt(r.kind === "PRODUCT" ? r.sltn_total : r.qty_total)}</td><td>${esc(r.kind === "PRODUCT" ? ("SL: " + fmt(r.sltn_sl) + " / Mẫu: " + fmt(r.sltn_mau)) : r.description)}</td>
     </tr>`).join("") || emptyRow(7, "Không tìm thấy dòng hợp lệ");
     setProgress(`Đã đọc ${fmt(rows.length)} dòng hợp lệ. Bảng chỉ xem trước 200 dòng đầu.`, 100);
     toast(`Đã đọc ${fmt(rows.length)} dòng`, "success");
@@ -624,6 +631,27 @@ async function uploadExcel() {
     if (!state.excelRows.length) await previewExcel();
     if (!state.excelRows.length) throw new Error("Không có dữ liệu hợp lệ để import");
     if (!confirm(`Import ${state.excelRows.length} dòng lên D1?`)) return;
+
+    const isProductImport = state.excelRows.every((r) => r.kind === "PRODUCT");
+
+    if (isProductImport) {
+      let done = 0, inserted = 0, updated = 0, errors = 0;
+      const batches = [];
+      for (let i = 0; i < state.excelRows.length; i += IMPORT_BATCH_SIZE) batches.push(state.excelRows.slice(i, i + IMPORT_BATCH_SIZE));
+      for (let i = 0; i < batches.length; i++) {
+        setProgress(`Đang cập nhật danh mục/SLTN lô ${i + 1}/${batches.length}...`, Math.round((i / batches.length) * 90) + 5);
+        const res = await api("/api/products/bulk-upsert", { method: "POST", body: { rows: batches[i] } });
+        done += batches[i].length;
+        inserted += Number(res.inserted || 0);
+        updated += Number(res.updated || 0);
+        errors += Number(res.errors || 0);
+      }
+      setProgress(`Xong: ${fmt(done)} mã hàng, thêm ${fmt(inserted)}, cập nhật ${fmt(updated)}, lỗi ${fmt(errors)}.`, 100);
+      toast(errors ? `Cập nhật SLTN xong nhưng có ${errors} dòng lỗi` : "Đã cập nhật danh mục/SLTN", errors ? "warn" : "success");
+      state.pages.products = 1;
+      setView("products");
+      return;
+    }
 
     const job = await api("/api/import-jobs", { method: "POST", body: { file_name: file.name, file_size: file.size, source_note: "Import từ giao diện web" } });
     const jobId = job.job_id;
@@ -658,6 +686,11 @@ async function parseExcelFile(file) {
   const mode = $("excelSheetMode").value;
   const startRow = Math.max(1, Number($("excelStartRow").value || 1));
   const rows = [];
+  if (mode === "PRODUCTS") {
+    const name = findSheet(wb, ["TONGHOPNX", "TongHopNX", "Tổng hợp", "Tong Hop"]);
+    if (name) rows.push(...parseTongHopProductsSheet(wb.Sheets[name], startRow));
+    return rows.filter((r) => r.kind === "PRODUCT" && r.product_code);
+  }
   if (mode === "BOTH" || mode === "NHAP") {
     const name = findSheet(wb, ["NHAP", "Nhập", "Nhap"]);
     if (name) rows.push(...parseNhapSheet(wb.Sheets[name], startRow));
@@ -676,6 +709,39 @@ function findSheet(wb, names) {
 
 function sheetToRows(sheet) {
   return XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: "" });
+}
+
+function parseTongHopProductsSheet(sheet, startRow) {
+  const a = sheetToRows(sheet);
+  const rows = [];
+  // TongHopNX trong file hiện tại: dòng tiêu đề nằm quanh dòng 4-5, dữ liệu bắt đầu từ dòng 7.
+  // Vẫn cho startRow = 1 để app tự bỏ qua dòng tiêu đề/TOTAL.
+  for (let i = Math.max(0, startRow - 1); i < a.length; i++) {
+    const r = a[i] || [];
+    const productCode = clean(r[4]) || clean(r[1]);
+    if (!productCode || isTotalRow(productCode) || productCode.toUpperCase() === "MÃ HÀNG") continue;
+    const productName = clean(r[5]);
+    const unit = clean(r[6]) || "PCS";
+    const sltnTotal = num(r[7]);
+    const sltnSl = num(r[8]);
+    const sltnMau = num(r[9]);
+    if (!sltnTotal && !sltnSl && !sltnMau && !productName) continue;
+    rows.push({
+      kind: "PRODUCT",
+      source_sheet: "TONGHOPNX",
+      source_row: i + 1,
+      product_code: productCode,
+      product_name: productName,
+      unit,
+      customer_name: clean(r[3]),
+      item_group: clean(r[2]),
+      sltn_total: sltnTotal,
+      sltn_sl: sltnSl,
+      sltn_mau: sltnMau,
+      raw_json: compactRaw(r),
+    });
+  }
+  return rows;
 }
 
 function parseNhapSheet(sheet, startRow) {
