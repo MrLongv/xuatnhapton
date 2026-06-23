@@ -9,7 +9,7 @@ const STORAGE = {
   user: "xnt_user",
 };
 
-const DEFAULT_API_BASE = "https://xuat-nhap-ton-api.lequangthuan1988.workers.dev"; // Có thể điền sẵn: https://xuat-nhap-ton-api.xxx.workers.dev
+const DEFAULT_API_BASE = "https://xuat-nhap-ton-api.lequangthuan1988.workers.dev";
 const PAGE_LIMIT = 50;
 const IMPORT_BATCH_SIZE = 500;
 
@@ -59,7 +59,6 @@ function init() {
   bindDialogs();
 
   $("apiBaseInput").value = state.apiBase;
-  $("setupApiBaseInput").value = state.apiBase;
 
   if (state.token) {
     showApp();
@@ -74,14 +73,16 @@ function init() {
 // =========================================================
 
 function normalizeApiBase(v) {
-  const s = String(v || "").trim().replace(/\/+$/, "");
-  return s || location.origin;
+  let s = String(v || "").trim().replace(/\/+$/, "");
+  if (!s) return location.origin;
+  if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
+  return s;
 }
 
 async function api(path, options = {}) {
   const method = options.method || "GET";
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
-  if (state.token) headers.Authorization = `Bearer ${state.token}`;
+  if (state.token && options.auth !== false) headers.Authorization = `Bearer ${state.token}`;
   const url = `${normalizeApiBase(state.apiBase)}${path}`;
   const init = { method, headers };
   if (options.body !== undefined) init.body = typeof options.body === "string" ? options.body : JSON.stringify(options.body);
@@ -91,7 +92,7 @@ async function api(path, options = {}) {
   let data = {};
   try { data = text ? JSON.parse(text) : {}; } catch { data = { ok: false, error: text || "Response không phải JSON" }; }
   if (!res.ok || data.ok === false) {
-    if (res.status === 401) handleSessionExpired();
+    if (res.status === 401 && !["/api/login", "/api/health", "/"].includes(path)) handleSessionExpired();
     throw new Error(data.error || `HTTP ${res.status}`);
   }
   return data;
@@ -122,20 +123,11 @@ function handleSessionExpired() {
 // =========================================================
 
 function bindAuth() {
-  $$('[data-auth-tab]').forEach((btn) => {
-    btn.addEventListener("click", () => {
-      $$('[data-auth-tab]').forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      const tab = btn.dataset.authTab;
-      $("loginForm").classList.toggle("hidden", tab !== "login");
-      $("setupForm").classList.toggle("hidden", tab !== "setup");
-    });
-  });
-
   $("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
       saveApiBase($("apiBaseInput").value);
+      setButtonLoading($("loginBtn"), true, "Đang đăng nhập...");
       const data = await api("/api/login", {
         method: "POST",
         body: { username: $("usernameInput").value.trim(), password: $("passwordInput").value },
@@ -149,29 +141,21 @@ function bindAuth() {
       await bootstrapApp();
     } catch (err) {
       toast(err.message, "error");
+    } finally {
+      setButtonLoading($("loginBtn"), false);
     }
   });
 
-  $("setupForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
+  $("testApiBtn").addEventListener("click", async () => {
     try {
-      saveApiBase($("setupApiBaseInput").value);
-      const password = $("setupPasswordInput").value;
-      if (!password) throw new Error("Vui lòng nhập mật khẩu admin");
-      const data = await api("/api/setup", {
-        method: "POST",
-        body: {
-          username: $("setupUsernameInput").value.trim() || "admin",
-          password,
-          display_name: $("setupDisplayInput").value.trim() || "Admin",
-        },
-      });
-      toast(data.message || "Đã tạo admin", "success");
-      $("usernameInput").value = $("setupUsernameInput").value.trim() || "admin";
-      $("passwordInput").value = password;
-      $$('[data-auth-tab]')[0].click();
+      saveApiBase($("apiBaseInput").value);
+      setButtonLoading($("testApiBtn"), true, "Đang kiểm tra...");
+      const data = await api("/api/health", { method: "GET", auth: false });
+      toast(data.ok ? "API Worker kết nối được D1" : "API trả về không hợp lệ", data.ok ? "success" : "warn");
     } catch (err) {
-      toast(err.message, "error");
+      toast(`Không kết nối được API: ${err.message}`, "error");
+    } finally {
+      setButtonLoading($("testApiBtn"), false);
     }
   });
 
@@ -658,6 +642,7 @@ async function previewExcel() {
 
 async function uploadExcel() {
   try {
+    if (state.user?.role !== "admin") throw new Error("Chỉ admin được import Excel lên D1");
     const file = $("excelFileInput").files[0];
     if (!file) throw new Error("Vui lòng chọn file Excel");
     if (!state.excelRows.length) await previewExcel();
@@ -695,7 +680,7 @@ async function parseExcelFile(file) {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array", cellDates: false, raw: true });
   const mode = $("excelSheetMode").value;
-  const startRow = Math.max(1, Number($("excelStartRow").value || 10));
+  const startRow = Math.max(1, Number($("excelStartRow").value || 1));
   const rows = [];
   if (mode === "BOTH" || mode === "NHAP") {
     const name = findSheet(wb, ["NHAP", "Nhập", "Nhap"]);
@@ -829,10 +814,11 @@ async function loadPeriods() {
       <td><strong>${esc(r.id)}</strong></td><td>${esc(displayDate(r.start_date))}</td><td>${esc(displayDate(r.end_date))}</td>
       <td><span class="badge ${r.status === "locked" ? "danger" : "success"}">${r.status === "locked" ? "Đã khóa" : "Đang mở"}</span></td>
       <td>${esc(displayDateTime(r.locked_at))}</td><td>${esc(r.note)}</td>
-      <td class="right">${r.status === "locked" ? `<button class="tiny" data-unlock-period="${esc(r.id)}">Mở khóa</button>` : `<button class="tiny danger" data-lock-period="${esc(r.id)}">Khóa</button>`}</td>
+      <td class="right">${r.status === "locked" ? `<button class="tiny admin-only" data-unlock-period="${esc(r.id)}">Mở khóa</button>` : `<button class="tiny danger admin-only" data-lock-period="${esc(r.id)}">Khóa</button>`}</td>
     </tr>`).join("") || emptyRow(7);
     $$('[data-lock-period]').forEach((b) => b.addEventListener("click", () => lockPeriod(b.dataset.lockPeriod)));
     $$('[data-unlock-period]').forEach((b) => b.addEventListener("click", () => unlockPeriod(b.dataset.unlockPeriod)));
+    applyRoleVisibility();
   } catch (err) { toast(err.message, "error"); }
 }
 
@@ -935,6 +921,19 @@ function bindDialogs() {
 }
 
 function closeDialog(id) { $(id)?.close(); }
+
+function setButtonLoading(btn, loading, text = "Đang xử lý...") {
+  if (!btn) return;
+  if (loading) {
+    btn.dataset.oldText = btn.textContent;
+    btn.textContent = text;
+    btn.disabled = true;
+  } else {
+    btn.textContent = btn.dataset.oldText || btn.textContent;
+    btn.disabled = false;
+  }
+}
+
 
 function bindPager(kind, loader) {
   $(`${kind}Prev`)?.addEventListener("click", () => { if (state.pages[kind] > 1) { state.pages[kind]--; loader(); } });
