@@ -5,18 +5,17 @@
 
 const STORAGE = {
   token: "xnt_token",
-  apiBase: "xnt_api_base",
   user: "xnt_user",
 };
 
-const DEFAULT_API_BASE = "https://xuat-nhap-ton-api.lequangthuan1988.workers.dev";
+const API_BASE = "https://xuat-nhap-ton-api.lequangthuan1988.workers.dev";
+const APP_VERSION = "20260623-official-v2";
 const PAGE_LIMIT = 50;
 const IMPORT_BATCH_SIZE = 500;
 
 const state = {
   token: localStorage.getItem(STORAGE.token) || "",
   user: safeJson(localStorage.getItem(STORAGE.user)) || null,
-  apiBase: localStorage.getItem(STORAGE.apiBase) || DEFAULT_API_BASE || location.origin,
   view: "dashboard",
   year: new Date().getFullYear(),
   month: new Date().getMonth() + 1,
@@ -40,9 +39,12 @@ const state = {
 const $ = (id) => document.getElementById(id);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
+window.XNT_APP_VERSION = APP_VERSION;
 window.addEventListener("DOMContentLoaded", init);
 
 function init() {
+  // Xóa cấu hình cũ của bản test có ô API Worker để tránh cache/trộn phiên bản.
+  localStorage.removeItem("xnt_api_base");
   initYearMonth();
   bindAuth();
   bindNavigation();
@@ -58,7 +60,6 @@ function init() {
   bindUsers();
   bindDialogs();
 
-  $("apiBaseInput").value = state.apiBase;
 
   if (state.token) {
     showApp();
@@ -72,18 +73,11 @@ function init() {
 // API
 // =========================================================
 
-function normalizeApiBase(v) {
-  let s = String(v || "").trim().replace(/\/+$/, "");
-  if (!s) return location.origin;
-  if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
-  return s;
-}
-
 async function api(path, options = {}) {
   const method = options.method || "GET";
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   if (state.token && options.auth !== false) headers.Authorization = `Bearer ${state.token}`;
-  const url = `${normalizeApiBase(state.apiBase)}${path}`;
+  const url = `${API_BASE}${path}`;
   const init = { method, headers };
   if (options.body !== undefined) init.body = typeof options.body === "string" ? options.body : JSON.stringify(options.body);
 
@@ -106,10 +100,6 @@ function qs(obj) {
   return p.toString() ? `?${p.toString()}` : "";
 }
 
-function saveApiBase(v) {
-  state.apiBase = normalizeApiBase(v);
-  localStorage.setItem(STORAGE.apiBase, state.apiBase);
-}
 
 function handleSessionExpired() {
   localStorage.removeItem(STORAGE.token);
@@ -126,7 +116,6 @@ function bindAuth() {
   $("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
-      saveApiBase($("apiBaseInput").value);
       setButtonLoading($("loginBtn"), true, "Đang đăng nhập...");
       const data = await api("/api/login", {
         method: "POST",
@@ -143,19 +132,6 @@ function bindAuth() {
       toast(err.message, "error");
     } finally {
       setButtonLoading($("loginBtn"), false);
-    }
-  });
-
-  $("testApiBtn").addEventListener("click", async () => {
-    try {
-      saveApiBase($("apiBaseInput").value);
-      setButtonLoading($("testApiBtn"), true, "Đang kiểm tra...");
-      const data = await api("/api/health", { method: "GET", auth: false });
-      toast(data.ok ? "API Worker kết nối được D1" : "API trả về không hợp lệ", data.ok ? "success" : "warn");
-    } catch (err) {
-      toast(`Không kết nối được API: ${err.message}`, "error");
-    } finally {
-      setButtonLoading($("testApiBtn"), false);
     }
   });
 
