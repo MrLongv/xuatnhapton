@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#f4efe7" />
   <title>Xuất Nhập Tồn</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=20260623_sltn_v3" />
 </head>
 <body>
   <div id="toastHost" class="toast-host" aria-live="polite"></div>
@@ -110,7 +110,7 @@
           <button id="productSearchBtn" class="soft" type="button">Tìm</button>
           <button id="productAddBtn" class="primary admin-staff" type="button">+ Mã hàng</button>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th>Khách hàng</th><th>Nhóm</th><th>TT</th><th></th></tr></thead><tbody id="productsTbody"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th>Khách hàng</th><th>Nhóm</th><th>SLTN</th><th>SL</th><th>Mẫu</th><th>TT</th><th></th></tr></thead><tbody id="productsTbody"></tbody></table></div>
         <div class="pager"><button id="productsPrev" class="ghost">Trước</button><span id="productsPage">1</span><button id="productsNext" class="ghost">Sau</button></div>
       </section>
 
@@ -166,13 +166,13 @@
       <section id="importExcelView" class="view">
         <div class="panel import-panel">
           <h3>Import file Excel .xlsb / .xlsx</h3>
-          <p class="muted">Ứng dụng đọc sheet <b>NHAP</b> và <b>XUAT</b>, bỏ qua dòng trống, gửi dữ liệu lên Worker theo lô 500 dòng.</p>
+          <p class="muted">Ứng dụng đọc sheet <b>NHAP</b>, <b>XUAT</b> hoặc <b>TongHopNX</b>. TongHopNX dùng để cập nhật danh mục mã hàng và SLTN.</p>
           <div class="form-grid">
             <label>Chọn file
               <input id="excelFileInput" type="file" accept=".xls,.xlsx,.xlsb,.xlsm" />
             </label>
             <label>Sheet cần import
-              <select id="excelSheetMode"><option value="BOTH">NHAP + XUAT</option><option value="NHAP">Chỉ NHAP</option><option value="XUAT">Chỉ XUAT</option></select>
+              <select id="excelSheetMode"><option value="PRODUCTS">Danh mục + SLTN (TongHopNX)</option><option value="BOTH">NHAP + XUAT</option><option value="NHAP">Chỉ NHAP</option><option value="XUAT">Chỉ XUAT</option></select>
             </label>
             <label>Dòng dữ liệu bắt đầu
               <input id="excelStartRow" type="number" min="1" value="1" />
@@ -186,7 +186,7 @@
         </div>
         <div class="panel">
           <h3>Dữ liệu xem trước</h3>
-          <div class="table-wrap"><table><thead><tr><th>Sheet</th><th>Dòng</th><th>Ngày</th><th>Mã hàng</th><th>Tên hàng</th><th>SL</th><th>Diễn giải</th></tr></thead><tbody id="excelPreviewTbody"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Sheet</th><th>Dòng</th><th>Ngày</th><th>Mã hàng</th><th>Tên hàng</th><th>SL/SLTN</th><th>Diễn giải</th></tr></thead><tbody id="excelPreviewTbody"></tbody></table></div>
         </div>
       </section>
 
@@ -216,6 +216,9 @@
         <label>Mã hàng <input id="productCode" required /></label>
         <label>Tên hàng <input id="productName" /></label>
         <label>ĐVT <input id="productUnit" value="PCS" /></label>
+        <label>SLTN tổng <input id="productSltnTotal" type="number" step="0.01" min="0" value="0" /></label>
+        <label>SL tác nghiệp <input id="productSltnSl" type="number" step="0.01" min="0" value="0" /></label>
+        <label>Mẫu <input id="productSltnMau" type="number" step="0.01" min="0" value="0" /></label>
         <label>Khách hàng <input id="productCustomer" /></label>
         <label>Nhóm <input id="productGroup" /></label>
         <label>Trạng thái <select id="productActive"><option value="1">Active</option><option value="0">Ngưng</option></select></label>
@@ -266,6 +269,6 @@
   </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=20260623_sltn_v3"></script>
 </body>
 </html>
