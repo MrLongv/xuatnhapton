@@ -631,11 +631,12 @@ async function loadNxt() {
     updatePeriodSelectorState();
     $("nxtTbody").innerHTML = data.rows.map((r) => `<tr>
       <td><strong>${esc(r.product_code)}</strong></td><td>${esc(r.product_name)}</td><td>${esc(r.unit)}</td>
+      <td class="num strong">${fmt(r.sltn_total)}</td><td class="num">${fmt(r.sltn_sl)}</td><td class="num">${fmt(r.sltn_mau)}</td>
       <td class="num">${fmt(r.opening_qty)}</td><td class="num good">${fmt(r.import_qty)}</td><td class="num bad">${fmt(r.export_qty)}</td>
       <td class="num">${fmt(r.adjustment_qty)}</td><td class="num strong">${fmt(r.closing_qty)}</td>
       <td class="num">${fmtMoney(r.unit_price_usd, 4)}</td><td class="num">${fmtMoney(r.unit_price_vnd)}</td>
       <td class="num good">${fmtMoney(r.import_amount_usd, 2)}</td><td class="num bad">${fmtMoney(r.export_amount_vnd)}</td>
-    </tr>`).join("") || emptyRow(12);
+    </tr>`).join("") || emptyRow(15);
     $("nxtPage").textContent = data.page;
     setPagerState("nxt", data);
   } catch (err) { toast(err.message, "error"); }
@@ -710,8 +711,11 @@ async function previewExcel() {
     state.lastRows.excelPreview = rows.slice(0, 200);
     $("excelPreviewTbody").innerHTML = rows.slice(0, 200).map((r) => `<tr>
       <td>${esc(r.source_sheet)}</td><td>${esc(r.source_row)}</td><td>${esc(r.doc_date || "")}</td><td><strong>${esc(r.product_code)}</strong></td>
-      <td>${esc(r.product_name)}</td><td class="num">${fmt(r.kind === "PRODUCT" ? r.sltn_total : r.qty_total)}</td><td>${esc(r.kind === "PRODUCT" ? ("SL: " + fmt(r.sltn_sl) + " / Mẫu: " + fmt(r.sltn_mau)) : r.description)}</td>
-    </tr>`).join("") || emptyRow(7, "Không tìm thấy dòng hợp lệ");
+      <td>${esc(r.product_name)}</td><td class="num">${fmt(r.kind === "PRODUCT" ? r.sltn_total : r.qty_total)}</td>
+      <td class="num">${r.kind === "PRODUCT" ? "" : fmtMoney(r.unit_price_usd, 4)}</td><td class="num">${r.kind === "PRODUCT" ? "" : fmtMoney(r.unit_price_vnd)}</td>
+      <td class="num">${r.kind === "PRODUCT" ? "" : fmtMoney(r.amount_usd, 2)}</td><td class="num">${r.kind === "PRODUCT" ? "" : fmtMoney(r.amount_vnd)}</td>
+      <td>${esc(r.kind === "PRODUCT" ? ("SL: " + fmt(r.sltn_sl) + " / Mẫu: " + fmt(r.sltn_mau)) : r.description)}</td>
+    </tr>`).join("") || emptyRow(11, "Không tìm thấy dòng hợp lệ");
     setProgress(`Đã đọc ${fmt(rows.length)} dòng hợp lệ. Bảng chỉ xem trước 200 dòng đầu.`, 100);
     toast(`Đã đọc ${fmt(rows.length)} dòng`, "success");
   } catch (err) {
@@ -808,6 +812,82 @@ function sheetToRows(sheet) {
   return XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: "" });
 }
 
+
+function normalizeHeaderKey(v) {
+  return normalizeVietnamese(v).replace(/[^A-Z0-9]/g, "");
+}
+
+function buildHeaderMap(row) {
+  const map = {};
+  (row || []).forEach((h, i) => {
+    const key = normalizeHeaderKey(h);
+    if (key && map[key] === undefined) map[key] = i;
+  });
+  return map;
+}
+
+function headerIndex(map, names) {
+  for (const name of names) {
+    const key = normalizeHeaderKey(name);
+    if (map[key] !== undefined) return map[key];
+  }
+  return -1;
+}
+
+function headerValue(row, map, names) {
+  const idx = headerIndex(map, names);
+  return idx >= 0 ? row[idx] : "";
+}
+
+function headerText(row, map, names) {
+  return clean(headerValue(row, map, names));
+}
+
+function headerNum(row, map, names) {
+  return num(headerValue(row, map, names));
+}
+
+function findHeaderConfig(rows, startRow) {
+  const candidates = [];
+  const a = Math.max(0, startRow - 1);
+  const b = Math.max(0, startRow - 2);
+  candidates.push(a);
+  if (b !== a) candidates.push(b);
+  // Dự phòng cho file mẫu: nếu người dùng để startRow sai, vẫn dò 10 dòng đầu.
+  for (let i = 0; i < Math.min(10, rows.length); i++) if (!candidates.includes(i)) candidates.push(i);
+
+  for (const idx of candidates) {
+    const map = buildHeaderMap(rows[idx] || []);
+    const hasNgay = headerIndex(map, ["Ngày", "Ngay", "Date", "Doc date"]) >= 0;
+    const hasMa = headerIndex(map, ["Mã hàng", "Ma hang", "Product code", "Code"]) >= 0;
+    const hasQty = headerIndex(map, ["Tổng SL", "Tong SL", "Qty total", "Số lượng", "So luong"]) >= 0;
+    if (hasNgay && hasMa && hasQty) return { headerRow: idx, map };
+  }
+  return null;
+}
+
+function monthFromIsoDate(iso) {
+  const m = String(iso || "").match(/^\d{4}-(\d{2})-/);
+  return m ? Number(m[1]) : null;
+}
+
+function firstNhapPriceFromHeaders(row, map) {
+  for (let m = 1; m <= 12; m++) {
+    const v = headerNum(row, map, [`ĐG nhập T${m} USD`, `DG nhập T${m} USD`, `Đơn giá nhập T${m} USD`, `Don gia nhap T${m} USD`]);
+    if (v > 0) return { month: m, usd: v };
+  }
+  return null;
+}
+
+function firstXuatPriceFromHeaders(row, map) {
+  for (let m = 1; m <= 12; m++) {
+    const usd = headerNum(row, map, [`ĐG xuất T${m} USD`, `DG xuất T${m} USD`, `Đơn giá xuất T${m} USD`, `Don gia xuat T${m} USD`]);
+    const vnd = headerNum(row, map, [`ĐG xuất T${m} VND`, `DG xuất T${m} VND`, `Đơn giá xuất T${m} VND`, `Don gia xuat T${m} VND`]);
+    if (usd > 0 || vnd > 0) return { month: m, usd: usd || null, vnd: vnd || null };
+  }
+  return null;
+}
+
 function parseTongHopProductsSheet(sheet, startRow) {
   const a = sheetToRows(sheet);
   const rows = [];
@@ -843,6 +923,59 @@ function parseTongHopProductsSheet(sheet, startRow) {
 
 function parseNhapSheet(sheet, startRow) {
   const a = sheetToRows(sheet);
+  const cfg = findHeaderConfig(a, startRow);
+  if (cfg) return parseNhapSheetByHeaderRows(a, cfg, startRow);
+  return parseNhapSheetByPositionRows(a, startRow);
+}
+
+function parseNhapSheetByHeaderRows(a, cfg, startRow) {
+  const rows = [];
+  const map = cfg.map;
+  const dataStart = Math.max(cfg.headerRow + 1, startRow > cfg.headerRow + 1 ? startRow - 1 : cfg.headerRow + 1);
+  for (let i = dataStart; i < a.length; i++) {
+    const r = a[i] || [];
+    const productCode = headerText(r, map, ["Mã hàng", "Ma hang", "Product code", "Code"]);
+    if (!productCode || isTotalRow(productCode)) continue;
+    const docDate = excelDateToIso(headerValue(r, map, ["Ngày", "Ngay", "Date", "Doc date"]));
+    const unitPriceDirectUsd = headerNum(r, map, ["ĐG USD", "DG USD", "Đơn giá USD", "Don gia USD", "Unit price USD"]);
+    const unitPriceDirectVnd = headerNum(r, map, ["ĐG VND", "DG VND", "Đơn giá VND", "Don gia VND", "Unit price VND"]);
+    const monthlyPrice = firstNhapPriceFromHeaders(r, map);
+    const row = {
+      source_sheet: "NHAP",
+      source_row: i + 1,
+      doc_type: "IMPORT",
+      doc_date: docDate,
+      description: headerText(r, map, ["Diễn giải", "Dien giai", "Description"]) || "NHẬP",
+      product_code: productCode,
+      product_name: headerText(r, map, ["Tên hàng", "Ten hang", "Product name", "Name"]),
+      unit: headerText(r, map, ["ĐVT", "DVT", "Unit"]) || "PCS",
+      qty_total: headerNum(r, map, ["Tổng SL", "Tong SL", "Qty total", "Số lượng", "So luong"]),
+      unit_price_usd: unitPriceDirectUsd || monthlyPrice?.usd || null,
+      unit_price_vnd: unitPriceDirectVnd || null,
+      amount_usd: headerNum(r, map, ["TT USD", "Thành tiền USD", "Thanh tien USD", "Amount USD"]),
+      amount_vnd: headerNum(r, map, ["TT VND", "Thành tiền VND", "Thanh tien VND", "Amount VND"]),
+      ton_dau_ky_kho: headerNum(r, map, ["Tồn ĐK KHO", "Ton DK KHO", "Opening KHO"]),
+      ton_dau_ky_kho_tk: headerNum(r, map, ["Tồn ĐK KHO TK", "Ton DK KHO TK", "Opening KHO TK"]),
+      ton_dau_ky_km: headerNum(r, map, ["Tồn ĐK KM", "Ton DK KM", "Opening KM"]),
+      ton_dau_ky_tk: headerNum(r, map, ["Tồn ĐK TK", "Ton DK TK", "Opening TK"]),
+      ton_dau_ky_top: headerNum(r, map, ["Tồn ĐK TOP", "Ton DK TOP", "Opening TOP"]),
+      nhap_pstk_kho: headerNum(r, map, ["Nhập PSTK KHO", "Nhap PSTK KHO", "Nhập KHO", "Nhap KHO", "Qty KHO"]),
+      nhap_pstk_kho_tk: headerNum(r, map, ["Nhập PSTK KHO TK", "Nhap PSTK KHO TK", "Nhập KHO TK", "Nhap KHO TK", "Qty KHO TK"]),
+      nhap_pstk_km: headerNum(r, map, ["Nhập PSTK KM", "Nhap PSTK KM", "Nhập KM", "Nhap KM", "Qty KM"]),
+      nhap_pstk_tk: headerNum(r, map, ["Nhập PSTK TK", "Nhap PSTK TK", "Nhập TK", "Nhap TK", "Qty TK"]),
+      nhap_pstk_top: headerNum(r, map, ["Nhập PSTK TOP", "Nhap PSTK TOP", "Nhập TOP", "Nhap TOP", "Qty TOP"]),
+      raw_json: compactRaw(r),
+    };
+    if (!row.qty_total) row.qty_total = sumNums([row.ton_dau_ky_kho, row.ton_dau_ky_kho_tk, row.ton_dau_ky_km, row.ton_dau_ky_tk, row.ton_dau_ky_top, row.nhap_pstk_kho, row.nhap_pstk_kho_tk, row.nhap_pstk_km, row.nhap_pstk_tk, row.nhap_pstk_top]);
+    row.price_month = monthlyPrice?.month || monthFromIsoDate(row.doc_date);
+    if (!row.amount_usd && row.qty_total && row.unit_price_usd) row.amount_usd = roundMoney(row.qty_total * row.unit_price_usd, 2);
+    if (!row.amount_vnd && row.qty_total && row.unit_price_vnd) row.amount_vnd = roundMoney(row.qty_total * row.unit_price_vnd, 0);
+    rows.push(row);
+  }
+  return rows;
+}
+
+function parseNhapSheetByPositionRows(a, startRow) {
   const rows = [];
   for (let i = startRow - 1; i < a.length; i++) {
     const r = a[i] || [];
@@ -881,6 +1014,58 @@ function parseNhapSheet(sheet, startRow) {
 
 function parseXuatSheet(sheet, startRow) {
   const a = sheetToRows(sheet);
+  const cfg = findHeaderConfig(a, startRow);
+  if (cfg) return parseXuatSheetByHeaderRows(a, cfg, startRow);
+  return parseXuatSheetByPositionRows(a, startRow);
+}
+
+function parseXuatSheetByHeaderRows(a, cfg, startRow) {
+  const rows = [];
+  const map = cfg.map;
+  const dataStart = Math.max(cfg.headerRow + 1, startRow > cfg.headerRow + 1 ? startRow - 1 : cfg.headerRow + 1);
+  for (let i = dataStart; i < a.length; i++) {
+    const r = a[i] || [];
+    const productCode = headerText(r, map, ["Mã hàng", "Ma hang", "Product code", "Code"]);
+    if (!productCode || isTotalRow(productCode)) continue;
+    const docDate = excelDateToIso(headerValue(r, map, ["Ngày", "Ngay", "Date", "Doc date"]));
+    const unitPriceDirectUsd = headerNum(r, map, ["ĐG USD", "DG USD", "Đơn giá USD", "Don gia USD", "Unit price USD"]);
+    const unitPriceDirectVnd = headerNum(r, map, ["ĐG VND", "DG VND", "Đơn giá VND", "Don gia VND", "Unit price VND"]);
+    const monthlyPrice = firstXuatPriceFromHeaders(r, map);
+    const row = {
+      source_sheet: "XUAT",
+      source_row: i + 1,
+      doc_type: "EXPORT",
+      doc_date: docDate,
+      invoice_no: headerText(r, map, ["Số hóa đơn", "So hoa don", "Invoice no", "Invoice"]),
+      description: headerText(r, map, ["Diễn giải", "Dien giai", "Description"]) || "XUẤT",
+      product_code: productCode,
+      product_name: headerText(r, map, ["Tên hàng", "Ten hang", "Product name", "Name"]),
+      unit: headerText(r, map, ["ĐVT", "DVT", "Unit"]) || "PCS",
+      qty_total: headerNum(r, map, ["Tổng SL", "Tong SL", "Qty total", "Số lượng", "So luong"]),
+      unit_price_usd: unitPriceDirectUsd || monthlyPrice?.usd || null,
+      unit_price_vnd: unitPriceDirectVnd || monthlyPrice?.vnd || null,
+      amount_usd: headerNum(r, map, ["TT USD", "Thành tiền USD", "Thanh tien USD", "Amount USD"]),
+      amount_vnd: headerNum(r, map, ["TT VND", "Thành tiền VND", "Thanh tien VND", "Amount VND"]),
+      xuat_dau_ky_tp: headerNum(r, map, ["Xuất ĐK TP", "Xuat DK TP", "Opening out TP"]),
+      xuat_dau_ky_chuyen_kho_tk: headerNum(r, map, ["Xuất ĐK Chuyển kho TK", "Xuat DK Chuyen kho TK", "Opening out Chuyen kho TK"]),
+      xuat_dau_ky_kho_tk: headerNum(r, map, ["Xuất ĐK KHO TK", "Xuat DK KHO TK", "Opening out KHO TK"]),
+      xuat_dau_ky_mau: headerNum(r, map, ["Xuất ĐK Mẫu", "Xuat DK Mau", "Opening out Mau"]),
+      xuat_pstk_tp: headerNum(r, map, ["Xuất PSTK TP", "Xuat PSTK TP", "Xuất TP", "Xuat TP", "Qty TP"]),
+      xuat_pstk_chuyen_kho_tk: headerNum(r, map, ["Xuất PSTK Chuyển kho TK", "Xuat PSTK Chuyen kho TK", "Chuyển kho TK", "Chuyen kho TK", "Qty Chuyen kho TK"]),
+      xuat_pstk_kho_tk: headerNum(r, map, ["Xuất PSTK KHO TK", "Xuat PSTK KHO TK", "Xuất KHO TK", "Xuat KHO TK", "Qty KHO TK"]),
+      xuat_pstk_mau: headerNum(r, map, ["Xuất PSTK Mẫu", "Xuat PSTK Mau", "Xuất Mẫu", "Xuat Mau", "Qty Mau"]),
+      raw_json: compactRaw(r),
+    };
+    if (!row.qty_total) row.qty_total = sumNums([row.xuat_dau_ky_tp, row.xuat_dau_ky_chuyen_kho_tk, row.xuat_dau_ky_kho_tk, row.xuat_dau_ky_mau, row.xuat_pstk_tp, row.xuat_pstk_chuyen_kho_tk, row.xuat_pstk_kho_tk, row.xuat_pstk_mau]);
+    row.price_month = monthlyPrice?.month || monthFromIsoDate(row.doc_date);
+    if (!row.amount_usd && row.qty_total && row.unit_price_usd) row.amount_usd = roundMoney(row.qty_total * row.unit_price_usd, 2);
+    if (!row.amount_vnd && row.qty_total && row.unit_price_vnd) row.amount_vnd = roundMoney(row.qty_total * row.unit_price_vnd, 0);
+    rows.push(row);
+  }
+  return rows;
+}
+
+function parseXuatSheetByPositionRows(a, startRow) {
   const rows = [];
   for (let i = startRow - 1; i < a.length; i++) {
     const r = a[i] || [];
