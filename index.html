@@ -18,16 +18,11 @@
         <h1>Sổ xuất nhập tồn nhiều năm</h1>
         <p class="muted">Quản lý nhập kho, xuất kho, tổng hợp NXT, khóa kỳ và nhật ký thao tác trên Cloudflare D1.</p>
         <div class="auth-note">
-          <strong>Lần đầu dùng:</strong> chạy schema trên D1, deploy Worker, sau đó dùng tab <b>Tạo admin</b> để tạo tài khoản đầu tiên.
+          <strong>Đang chạy thật:</strong> DB đã tạo tài khoản trong D1, chỉ cần nhập API Worker rồi đăng nhập bằng user đã có.
         </div>
       </div>
 
       <div class="login-card">
-        <div class="tabs mini-tabs" role="tablist">
-          <button class="tab-btn active" data-auth-tab="login" type="button">Đăng nhập</button>
-          <button class="tab-btn" data-auth-tab="setup" type="button">Tạo admin</button>
-        </div>
-
         <form id="loginForm" class="auth-form" autocomplete="on">
           <label>API Worker
             <input id="apiBaseInput" type="url" placeholder="https://xuat-nhap-ton-api.xxx.workers.dev" autocomplete="off" />
@@ -38,26 +33,11 @@
           <label>Mật khẩu
             <input id="passwordInput" type="password" placeholder="••••••••" autocomplete="current-password" required />
           </label>
-          <button class="primary full" type="submit">Đăng nhập</button>
+          <button id="loginBtn" class="primary full" type="submit">Đăng nhập</button>
+          <button id="testApiBtn" class="ghost full" type="button">Kiểm tra API</button>
+          <p class="form-help">Tài khoản hiện có: <b>admin</b> hoặc <b>loantk</b>. Mật khẩu do bạn đã tạo trong D1.</p>
         </form>
-
-        <form id="setupForm" class="auth-form hidden" autocomplete="off">
-          <label>API Worker
-            <input id="setupApiBaseInput" type="url" placeholder="https://xuat-nhap-ton-api.xxx.workers.dev" autocomplete="off" />
-          </label>
-          <label>Tên hiển thị
-            <input id="setupDisplayInput" type="text" value="Admin" />
-          </label>
-          <label>Tài khoản admin
-            <input id="setupUsernameInput" type="text" value="admin" />
-          </label>
-          <label>Mật khẩu admin
-            <input id="setupPasswordInput" type="password" placeholder="Nhập mật khẩu mạnh" />
-          </label>
-          <button class="primary full" type="submit">Tạo admin đầu tiên</button>
-          <p class="form-help">API này chỉ chạy khi bảng <code>users</code> đang rỗng.</p>
-        </form>
-      </div>
+</div>
     </div>
   </section>
 
@@ -78,7 +58,7 @@
         <button class="nav-item" data-view="exports">Xuất kho</button>
         <button class="nav-item" data-view="nxt">Tổng hợp NXT</button>
         <button class="nav-item" data-view="ledger">Sổ phát sinh</button>
-        <button class="nav-item admin-staff" data-view="importExcel">Import Excel</button>
+        <button class="nav-item admin-only" data-view="importExcel">Import Excel</button>
         <button class="nav-item admin-staff" data-view="periods">Khóa kỳ</button>
         <button class="nav-item admin-staff" data-view="audit">Nhật ký</button>
         <button class="nav-item admin-only" data-view="users">Tài khoản</button>
@@ -199,7 +179,7 @@
               <select id="excelSheetMode"><option value="BOTH">NHAP + XUAT</option><option value="NHAP">Chỉ NHAP</option><option value="XUAT">Chỉ XUAT</option></select>
             </label>
             <label>Dòng dữ liệu bắt đầu
-              <input id="excelStartRow" type="number" min="1" value="10" />
+              <input id="excelStartRow" type="number" min="1" value="1" />
             </label>
           </div>
           <div class="toolbar">
