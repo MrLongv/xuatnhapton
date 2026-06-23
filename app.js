@@ -9,7 +9,7 @@ const STORAGE = {
 };
 
 const API_BASE = "https://xuat-nhap-ton-api.lequangthuan1988.workers.dev";
-const APP_VERSION = "20260623-sltn-v3";
+const APP_VERSION = "20260623-nxt-scope-v1";
 const PAGE_LIMIT = 50;
 const IMPORT_BATCH_SIZE = 500;
 
@@ -19,6 +19,7 @@ const state = {
   view: "dashboard",
   year: new Date().getFullYear(),
   month: new Date().getMonth() + 1,
+  nxtScope: "month", // month | year | all
   pages: {
     products: 1,
     imports: 1,
@@ -222,6 +223,7 @@ function setView(view) {
   }[view] || ["Xuất Nhập Tồn", ""];
   $("viewTitle").textContent = meta[0];
   $("viewSubtitle").textContent = meta[1];
+  updatePeriodSelectorState();
   loadCurrentView();
 }
 
@@ -260,6 +262,19 @@ function initYearMonth() {
 function setYearMonthControls() {
   $("yearSelect").value = String(state.year);
   $("monthSelect").value = String(state.month);
+  updatePeriodSelectorState();
+}
+
+function updatePeriodSelectorState() {
+  const y = $("yearSelect");
+  const m = $("monthSelect");
+  if (!y || !m) return;
+  const isNxt = state.view === "nxt";
+  const scope = state.nxtScope || "month";
+  y.disabled = isNxt && scope === "all";
+  m.disabled = isNxt && scope !== "month";
+  y.classList.toggle("muted-control", y.disabled);
+  m.classList.toggle("muted-control", m.disabled);
 }
 
 function periodId() {
@@ -376,7 +391,7 @@ async function loadDocs(kind, docType) {
       limit: PAGE_LIMIT,
     })}`);
     const tbody = $(`${kind}Tbody`);
-    tbody.innerHTML = data.rows.map((r) => kind === "imports" ? renderImportRow(r) : renderExportRow(r)).join("") || emptyRow(kind === "imports" ? 7 : 7);
+    tbody.innerHTML = data.rows.map((r) => kind === "imports" ? renderImportRow(r) : renderExportRow(r)).join("") || emptyRow(11);
     $(`${kind}Page`).textContent = data.page;
     setPagerState(kind, data);
     $$(`[data-view-doc]`, tbody).forEach((btn) => btn.addEventListener("click", () => openDocDialog(docType, btn.dataset.viewDoc)));
@@ -386,15 +401,31 @@ async function loadDocs(kind, docType) {
 
 function renderImportRow(r) {
   return `<tr>
-    <td>${esc(displayDate(r.doc_date))}</td><td>${esc(r.description)}</td><td>${fmt(r.line_count)}</td><td class="num">${fmt(r.qty_total)}</td>
-    <td>${esc(r.source_sheet || "manual")}</td><td><span class="badge">${esc(r.status)}</span></td>
+    <td>${esc(displayDate(r.doc_date))}</td>
+    <td>${esc(r.description)}</td>
+    <td>${fmt(r.line_count)}</td>
+    <td class="num">${fmt(r.qty_total)}</td>
+    <td class="num">${fmtMoney(r.unit_price_usd, 4)}</td>
+    <td class="num">${fmtMoney(r.unit_price_vnd)}</td>
+    <td class="num good">${fmtMoney(r.amount_usd, 2)}</td>
+    <td class="num good">${fmtMoney(r.amount_vnd)}</td>
+    <td>${esc(r.source_sheet || "manual")}</td>
+    <td><span class="badge">${esc(r.status)}</span></td>
     <td class="right"><button class="tiny" data-view-doc="${esc(r.id)}">Chi tiết</button> <button class="tiny danger admin-staff" data-cancel-doc="${esc(r.id)}">Hủy</button></td>
   </tr>`;
 }
 
 function renderExportRow(r) {
   return `<tr>
-    <td>${esc(displayDate(r.doc_date))}</td><td>${esc(r.invoice_no)}</td><td>${esc(r.description)}</td><td>${fmt(r.line_count)}</td><td class="num">${fmt(r.qty_total)}</td>
+    <td>${esc(displayDate(r.doc_date))}</td>
+    <td>${esc(r.invoice_no)}</td>
+    <td>${esc(r.description)}</td>
+    <td>${fmt(r.line_count)}</td>
+    <td class="num">${fmt(r.qty_total)}</td>
+    <td class="num">${fmtMoney(r.unit_price_usd, 4)}</td>
+    <td class="num">${fmtMoney(r.unit_price_vnd)}</td>
+    <td class="num bad">${fmtMoney(r.amount_usd, 2)}</td>
+    <td class="num bad">${fmtMoney(r.amount_vnd)}</td>
     <td>${esc(r.source_sheet || "manual")}</td>
     <td class="right"><button class="tiny" data-view-doc="${esc(r.id)}">Chi tiết</button> <button class="tiny danger admin-staff" data-cancel-doc="${esc(r.id)}">Hủy</button></td>
   </tr>`;
@@ -454,13 +485,42 @@ function addDocLine(docType, line = null) {
       <label>ĐVT <input class="line-unit" value="${esc(line?.unit || "PCS")}" /></label>
       <label>ĐG USD <input class="line-price-usd" type="number" step="0.0001" value="${line?.unit_price_usd ?? ""}" /></label>
       <label>ĐG VND <input class="line-price-vnd" type="number" step="0.01" value="${line?.unit_price_vnd ?? ""}" /></label>
+      <label>TT USD <input class="line-amount-usd" type="number" step="0.01" value="${line?.amount_usd ?? ""}" /></label>
+      <label>TT VND <input class="line-amount-vnd" type="number" step="0.01" value="${line?.amount_vnd ?? ""}" /></label>
       <label>Ghi chú <input class="line-note" value="${esc(line?.note || "")}" /></label>
     </div>
     <div class="bucket-grid">
       ${buckets.map((b) => `<label>${bucketLabel(b)}<input class="line-bucket" data-bucket="${b}" type="number" step="0.01" min="0" value="${qtyOf(b)}" /></label>`).join("")}
-    </div>`;
+    </div>
+    <p class="form-help line-help">Thành tiền sẽ tự tính = tổng số lượng × đơn giá. Có thể sửa tay nếu cần.</p>`;
   box.querySelector("[data-remove-line]").addEventListener("click", () => box.remove());
+  box.querySelectorAll(".line-amount-usd, .line-amount-vnd").forEach((input) => {
+    if (input.value) input.dataset.manual = "1";
+    input.addEventListener("input", () => { input.dataset.manual = input.value ? "1" : "0"; });
+  });
+  box.querySelectorAll(".line-bucket, .line-price-usd, .line-price-vnd").forEach((input) => {
+    input.addEventListener("input", () => refreshLineAmounts(box, false));
+  });
   $("docLinesBox").appendChild(box);
+  refreshLineAmounts(box, true);
+}
+
+function lineQtyTotal(card) {
+  return Array.from(card.querySelectorAll(".line-bucket")).reduce((sum, input) => sum + Number(input.value || 0), 0);
+}
+
+function refreshLineAmounts(card, initial = false) {
+  const total = lineQtyTotal(card);
+  const usd = nullableNumber(card.querySelector(".line-price-usd")?.value);
+  const vnd = nullableNumber(card.querySelector(".line-price-vnd")?.value);
+  const amountUsd = card.querySelector(".line-amount-usd");
+  const amountVnd = card.querySelector(".line-amount-vnd");
+  if (amountUsd && usd !== null && amountUsd.dataset.manual !== "1") {
+    amountUsd.value = roundMoney(total * usd, 2) || "";
+  }
+  if (amountVnd && vnd !== null && amountVnd.dataset.manual !== "1") {
+    amountVnd.value = roundMoney(total * vnd, 2) || "";
+  }
 }
 
 $("addDocLineBtn")?.addEventListener("click", () => addDocLine($("docType").value));
@@ -508,11 +568,23 @@ function collectDocLines(docType) {
         quantities,
         unit_price_usd: nullableNumber(card.querySelector(".line-price-usd").value),
         unit_price_vnd: nullableNumber(card.querySelector(".line-price-vnd").value),
+        amount_usd: docLineAmount(card, "usd", total),
+        amount_vnd: docLineAmount(card, "vnd", total),
+        price_month: Number(($("docDate").value || today()).slice(5, 7)) || null,
         note: card.querySelector(".line-note").value.trim(),
       });
     }
   });
   return out;
+}
+
+function docLineAmount(card, currency, total) {
+  const priceSelector = currency === "usd" ? ".line-price-usd" : ".line-price-vnd";
+  const amountSelector = currency === "usd" ? ".line-amount-usd" : ".line-amount-vnd";
+  const entered = nullableNumber(card.querySelector(amountSelector)?.value);
+  if (entered !== null) return entered;
+  const price = nullableNumber(card.querySelector(priceSelector)?.value);
+  return price !== null ? roundMoney(total * price, 2) : null;
 }
 
 async function cancelDoc(id, kind, docType) {
@@ -529,16 +601,23 @@ async function cancelDoc(id, kind, docType) {
 // =========================================================
 
 function bindNxt() {
+  $("nxtScopeSelect")?.addEventListener("change", () => {
+    state.nxtScope = $("nxtScopeSelect").value || "month";
+    state.pages.nxt = 1;
+    updatePeriodSelectorState();
+    loadNxt();
+  });
   $("nxtSearchBtn").addEventListener("click", () => { state.pages.nxt = 1; loadNxt(); });
   $("nxtSearch").addEventListener("keydown", (e) => { if (e.key === "Enter") { state.pages.nxt = 1; loadNxt(); } });
   $("nxtRebuildBtn").addEventListener("click", rebuildNxt);
-  $("nxtExportBtn").addEventListener("click", () => exportCsv("tong_hop_nxt.csv", state.lastRows.nxt));
+  $("nxtExportBtn").addEventListener("click", () => exportCsv(nxtExportFileName(), state.lastRows.nxt));
   bindPager("nxt", loadNxt);
 }
 
 async function loadNxt() {
   try {
     const data = await api(`/api/nxt${qs({
+      scope: state.nxtScope || "month",
       year: state.year,
       month: state.month,
       q: $("nxtSearch").value.trim(),
@@ -548,12 +627,15 @@ async function loadNxt() {
       limit: PAGE_LIMIT,
     })}`);
     state.lastRows.nxt = data.rows || [];
+    if ($("nxtScopeSelect")) $("nxtScopeSelect").value = state.nxtScope || "month";
+    updatePeriodSelectorState();
     $("nxtTbody").innerHTML = data.rows.map((r) => `<tr>
       <td><strong>${esc(r.product_code)}</strong></td><td>${esc(r.product_name)}</td><td>${esc(r.unit)}</td>
       <td class="num">${fmt(r.opening_qty)}</td><td class="num good">${fmt(r.import_qty)}</td><td class="num bad">${fmt(r.export_qty)}</td>
       <td class="num">${fmt(r.adjustment_qty)}</td><td class="num strong">${fmt(r.closing_qty)}</td>
-      <td class="num">${fmt(r.unit_price_usd)}</td><td class="num">${fmt(r.unit_price_vnd)}</td>
-    </tr>`).join("") || emptyRow(10);
+      <td class="num">${fmtMoney(r.unit_price_usd, 4)}</td><td class="num">${fmtMoney(r.unit_price_vnd)}</td>
+      <td class="num good">${fmtMoney(r.import_amount_usd, 2)}</td><td class="num bad">${fmtMoney(r.export_amount_vnd)}</td>
+    </tr>`).join("") || emptyRow(12);
     $("nxtPage").textContent = data.page;
     setPagerState("nxt", data);
   } catch (err) { toast(err.message, "error"); }
@@ -561,10 +643,23 @@ async function loadNxt() {
 
 async function rebuildNxt() {
   try {
-    const data = await api("/api/nxt/rebuild", { method: "POST", body: { period_id: periodId() } });
-    toast(`Đã tính lại ${data.period_id}: ${fmt(data.product_rows)} mã hàng`, "success");
+    const scope = state.view === "nxt" ? (state.nxtScope || "month") : "month";
+    if (scope === "all" && !confirm("Tính lại NXT tất cả các kỳ có thể mất lâu hơn. Tiếp tục?")) return;
+    const body = scope === "month"
+      ? { scope, period_id: periodId() }
+      : { scope, year: state.year };
+    const data = await api("/api/nxt/rebuild", { method: "POST", body });
+    if (scope === "month") toast(`Đã tính lại ${data.period_id}: ${fmt(data.product_rows)} mã hàng`, "success");
+    else toast(`Đã tính lại ${fmt(data.period_count || 0)} kỳ, ${fmt(data.product_rows || 0)} dòng tổng hợp`, "success");
     await loadCurrentView();
   } catch (err) { toast(err.message, "error"); }
+}
+
+function nxtExportFileName() {
+  const scope = state.nxtScope || "month";
+  if (scope === "all") return "tong_hop_nxt_tat_ca.csv";
+  if (scope === "year") return `tong_hop_nxt_${state.year}.csv`;
+  return `tong_hop_nxt_${periodId()}.csv`;
 }
 
 function bindLedger() {
@@ -587,8 +682,10 @@ async function loadLedger() {
     state.lastRows.ledger = data.rows || [];
     $("ledgerTbody").innerHTML = data.rows.map((r) => `<tr>
       <td>${esc(displayDate(r.doc_date))}</td><td>${esc(r.doc_type)}</td><td><strong>${esc(r.product_code)}</strong></td><td>${esc(r.product_name)}</td>
-      <td>${esc(r.bucket_code)}</td><td>${esc(r.direction)}</td><td class="num">${fmt(r.quantity)}</td><td>${esc(r.description)}</td>
-    </tr>`).join("") || emptyRow(8);
+      <td>${esc(r.bucket_code)}</td><td>${esc(r.direction)}</td><td class="num">${fmt(r.quantity)}</td>
+      <td class="num">${fmtMoney(r.unit_price_usd, 4)}</td><td class="num">${fmtMoney(r.unit_price_vnd)}</td>
+      <td class="num">${fmtMoney(r.amount_usd, 2)}</td><td class="num">${fmtMoney(r.amount_vnd)}</td><td>${esc(r.description)}</td>
+    </tr>`).join("") || emptyRow(12);
     $("ledgerPage").textContent = data.page;
     setPagerState("ledger", data);
   } catch (err) { toast(err.message, "error"); }
@@ -1017,6 +1114,8 @@ function esc(v) { return String(v ?? "").replace(/[&<>'"]/g, (c) => ({ "&": "&am
 function attrJson(v) { return esc(JSON.stringify(v || {})); }
 function safeJson(s) { try { return JSON.parse(s || "null"); } catch { return null; } }
 function fmt(v) { const n = Number(v || 0); return Number.isFinite(n) ? n.toLocaleString("vi-VN", { maximumFractionDigits: 2 }) : "0"; }
+function fmtMoney(v, maxDigits = 2) { const n = Number(v || 0); return Number.isFinite(n) ? n.toLocaleString("vi-VN", { minimumFractionDigits: 0, maximumFractionDigits: maxDigits }) : "0"; }
+function roundMoney(v, digits = 2) { const n = Number(v || 0); if (!Number.isFinite(n)) return 0; const f = 10 ** digits; return Math.round(n * f) / f; }
 function num(v) { if (v === null || v === undefined || v === "" || v === "-" || String(v).startsWith("0x")) return 0; const n = Number(String(v).replace(/,/g, "")); return Number.isFinite(n) ? n : 0; }
 function nullableNumber(v) { const n = num(v); return n || null; }
 function clean(v) { if (v === null || v === undefined) return ""; const s = String(v).trim(); return s.startsWith("0x") ? "" : s; }
