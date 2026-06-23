@@ -113,7 +113,7 @@ code { background: #f1e7da; border-radius: 6px; padding: 1px 5px; }
 .check input { width: auto; }
 
 .table-wrap { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: auto; box-shadow: 0 8px 24px rgba(80, 54, 25, .06); }
-table { width: 100%; border-collapse: collapse; min-width: 820px; }
+table { width: 100%; border-collapse: collapse; min-width: 1100px; }
 th, td { padding: 11px 12px; border-bottom: 1px solid #f0e6da; text-align: left; vertical-align: middle; }
 th { position: sticky; top: 0; background: #fff8ef; color: #6b4c33; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; z-index: 2; }
 tbody tr:hover { background: #fffbf4; }
@@ -134,13 +134,14 @@ tbody tr:hover { background: #fffbf4; }
 .modal::backdrop { background: rgba(41, 30, 20, .42); backdrop-filter: blur(4px); }
 .modal-card { padding: 22px; max-height: min(86vh, 920px); overflow: auto; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
-.form-grid.compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.form-grid.compact { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .span-2 { grid-column: span 2; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 18px; }
 .line-head, .line-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
 .doc-lines { display: grid; gap: 12px; }
 .doc-line-card { border: 1px solid var(--line); border-radius: 15px; padding: 14px; background: #fffcf6; }
 .bucket-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.line-help { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
 .import-panel .form-grid { align-items: end; }
 .progress { position: relative; height: 38px; border-radius: 999px; background: #efe3d5; overflow: hidden; border: 1px solid var(--line); margin-top: 12px; }
 .progress span { display: block; height: 100%; width: 0%; background: linear-gradient(135deg, var(--brand), var(--brand-2)); transition: width .2s ease; }
@@ -188,3 +189,6 @@ tbody tr:hover { background: #fffbf4; }
 .login-title h2 { margin: 0; font-size: 28px; }
 .login-title p { margin: 6px 0 0; color: var(--muted); }
 .nav-item.hidden, .admin-only.hidden, .admin-staff.hidden { display: none !important; }
+
+.scope-select { min-width: 126px; font-weight: 800; }
+.muted-control { opacity: .55; cursor: not-allowed; }
