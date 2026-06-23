@@ -16,28 +16,24 @@
         <div class="brand-mark">XNT</div>
         <p class="eyebrow">CÔNG TY TNHH MAY XUẤT KHẨU VIỆT HỒNG</p>
         <h1>Sổ xuất nhập tồn nhiều năm</h1>
-        <p class="muted">Quản lý nhập kho, xuất kho, tổng hợp NXT, khóa kỳ và nhật ký thao tác trên Cloudflare D1.</p>
-        <div class="auth-note">
-          <strong>Đang chạy thật:</strong> DB đã tạo tài khoản trong D1, chỉ cần nhập API Worker rồi đăng nhập bằng user đã có.
-        </div>
+        <p class="muted">Quản lý nhập kho, xuất kho, tổng hợp NXT, khóa kỳ và nhật ký thao tác.</p>
       </div>
 
       <div class="login-card">
         <form id="loginForm" class="auth-form" autocomplete="on">
-          <label>API Worker
-            <input id="apiBaseInput" type="url" placeholder="https://xuat-nhap-ton-api.xxx.workers.dev" autocomplete="off" />
-          </label>
+          <div class="login-title">
+            <h2>Đăng nhập</h2>
+            <p>Hệ thống xuất nhập tồn</p>
+          </div>
           <label>Tài khoản
-            <input id="usernameInput" type="text" placeholder="admin" autocomplete="username" required />
+            <input id="usernameInput" type="text" autocomplete="username" required />
           </label>
           <label>Mật khẩu
-            <input id="passwordInput" type="password" placeholder="••••••••" autocomplete="current-password" required />
+            <input id="passwordInput" type="password" autocomplete="current-password" required />
           </label>
           <button id="loginBtn" class="primary full" type="submit">Đăng nhập</button>
-          <button id="testApiBtn" class="ghost full" type="button">Kiểm tra API</button>
-          <p class="form-help">Tài khoản hiện có: <b>admin</b> hoặc <b>loantk</b>. Mật khẩu do bạn đã tạo trong D1.</p>
         </form>
-</div>
+      </div>
     </div>
   </section>
 
@@ -102,7 +98,7 @@
           </div>
           <div class="stack gap-sm">
             <button id="dashRebuildBtn" class="primary admin-staff" type="button">Tính lại NXT tháng này</button>
-            <button id="dashOpenImportBtn" class="soft admin-staff" type="button">Import Excel dữ liệu cũ</button>
+            <button id="dashOpenImportBtn" class="soft admin-staff" type="button">Import Excel</button>
             <button id="dashOpenNxtBtn" class="ghost" type="button">Xem tổng hợp NXT</button>
           </div>
         </div>
