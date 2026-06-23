@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f4efe7" />
+  <title>Xuất Nhập Tồn</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="toastHost" class="toast-host" aria-live="polite"></div>
+
+  <section id="authScreen" class="auth-screen">
+    <div class="auth-shell">
+      <div class="brand-card">
+        <div class="brand-mark">XNT</div>
+        <p class="eyebrow">CÔNG TY TNHH MAY XUẤT KHẨU VIỆT HỒNG</p>
+        <h1>Sổ xuất nhập tồn nhiều năm</h1>
+        <p class="muted">Quản lý nhập kho, xuất kho, tổng hợp NXT, khóa kỳ và nhật ký thao tác trên Cloudflare D1.</p>
+        <div class="auth-note">
+          <strong>Lần đầu dùng:</strong> chạy schema trên D1, deploy Worker, sau đó dùng tab <b>Tạo admin</b> để tạo tài khoản đầu tiên.
+        </div>
+      </div>
+
+      <div class="login-card">
+        <div class="tabs mini-tabs" role="tablist">
+          <button class="tab-btn active" data-auth-tab="login" type="button">Đăng nhập</button>
+          <button class="tab-btn" data-auth-tab="setup" type="button">Tạo admin</button>
+        </div>
+
+        <form id="loginForm" class="auth-form" autocomplete="on">
+          <label>API Worker
+            <input id="apiBaseInput" type="url" placeholder="https://xuat-nhap-ton-api.xxx.workers.dev" autocomplete="off" />
+          </label>
+          <label>Tài khoản
+            <input id="usernameInput" type="text" placeholder="admin" autocomplete="username" required />
+          </label>
+          <label>Mật khẩu
+            <input id="passwordInput" type="password" placeholder="••••••••" autocomplete="current-password" required />
+          </label>
+          <button class="primary full" type="submit">Đăng nhập</button>
+        </form>
+
+        <form id="setupForm" class="auth-form hidden" autocomplete="off">
+          <label>API Worker
+            <input id="setupApiBaseInput" type="url" placeholder="https://xuat-nhap-ton-api.xxx.workers.dev" autocomplete="off" />
+          </label>
+          <label>Tên hiển thị
+            <input id="setupDisplayInput" type="text" value="Admin" />
+          </label>
+          <label>Tài khoản admin
+            <input id="setupUsernameInput" type="text" value="admin" />
+          </label>
+          <label>Mật khẩu admin
+            <input id="setupPasswordInput" type="password" placeholder="Nhập mật khẩu mạnh" />
+          </label>
+          <button class="primary full" type="submit">Tạo admin đầu tiên</button>
+          <p class="form-help">API này chỉ chạy khi bảng <code>users</code> đang rỗng.</p>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <main id="appShell" class="app-shell hidden">
+    <aside id="sidebar" class="sidebar">
+      <div class="side-head">
+        <div class="brand-mark small">XNT</div>
+        <div>
+          <strong>Xuất Nhập Tồn</strong>
+          <span id="companyName">Việt Hồng</span>
+        </div>
+      </div>
+
+      <nav class="nav-list" aria-label="Menu chính">
+        <button class="nav-item active" data-view="dashboard">Tổng quan</button>
+        <button class="nav-item" data-view="products">Danh mục mã hàng</button>
+        <button class="nav-item" data-view="imports">Nhập kho</button>
+        <button class="nav-item" data-view="exports">Xuất kho</button>
+        <button class="nav-item" data-view="nxt">Tổng hợp NXT</button>
+        <button class="nav-item" data-view="ledger">Sổ phát sinh</button>
+        <button class="nav-item admin-staff" data-view="importExcel">Import Excel</button>
+        <button class="nav-item admin-staff" data-view="periods">Khóa kỳ</button>
+        <button class="nav-item admin-staff" data-view="audit">Nhật ký</button>
+        <button class="nav-item admin-only" data-view="users">Tài khoản</button>
+      </nav>
+
+      <div class="side-foot">
+        <div class="user-chip">
+          <span id="currentUserName">-</span>
+          <small id="currentUserRole">-</small>
+        </div>
+        <button id="logoutBtn" class="ghost full" type="button">Đăng xuất</button>
+      </div>
+    </aside>
+
+    <section class="workarea">
+      <header class="topbar">
+        <button id="menuToggle" class="icon-btn" type="button" aria-label="Mở menu">☰</button>
+        <div>
+          <h2 id="viewTitle">Tổng quan</h2>
+          <p id="viewSubtitle">Theo dõi xuất nhập tồn theo tháng.</p>
+        </div>
+        <div class="top-actions">
+          <select id="yearSelect" title="Năm"></select>
+          <select id="monthSelect" title="Tháng"></select>
+          <button id="refreshBtn" class="soft" type="button">Làm mới</button>
+        </div>
+      </header>
+
+      <section id="dashboardView" class="view active-view">
+        <div class="stats-grid">
+          <article class="stat-card"><span>Mã hàng active</span><strong id="statProducts">0</strong></article>
+          <article class="stat-card"><span>Phiếu nhập</span><strong id="statImports">0</strong></article>
+          <article class="stat-card"><span>Phiếu xuất</span><strong id="statExports">0</strong></article>
+          <article class="stat-card"><span>Tồn cuối kỳ</span><strong id="statClosing">0</strong></article>
+        </div>
+        <div class="panel two-col">
+          <div>
+            <h3>Tháng đang xem</h3>
+            <p class="big-period" id="dashboardPeriod">-</p>
+            <p id="periodStatusText" class="badge">-</p>
+          </div>
+          <div class="stack gap-sm">
+            <button id="dashRebuildBtn" class="primary admin-staff" type="button">Tính lại NXT tháng này</button>
+            <button id="dashOpenImportBtn" class="soft admin-staff" type="button">Import Excel dữ liệu cũ</button>
+            <button id="dashOpenNxtBtn" class="ghost" type="button">Xem tổng hợp NXT</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="productsView" class="view">
+        <div class="toolbar">
+          <input id="productSearch" class="grow" placeholder="Tìm mã hàng, tên hàng, khách hàng..." />
+          <button id="productSearchBtn" class="soft" type="button">Tìm</button>
+          <button id="productAddBtn" class="primary admin-staff" type="button">+ Mã hàng</button>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th>Khách hàng</th><th>Nhóm</th><th>TT</th><th></th></tr></thead><tbody id="productsTbody"></tbody></table></div>
+        <div class="pager"><button id="productsPrev" class="ghost">Trước</button><span id="productsPage">1</span><button id="productsNext" class="ghost">Sau</button></div>
+      </section>
+
+      <section id="importsView" class="view">
+        <div class="toolbar wrap">
+          <input id="importsSearch" class="grow" placeholder="Tìm ngày, mã, tên, diễn giải..." />
+          <input id="importsDateFrom" type="date" />
+          <input id="importsDateTo" type="date" />
+          <button id="importsSearchBtn" class="soft" type="button">Lọc</button>
+          <button id="importsAddBtn" class="primary admin-staff" type="button">+ Phiếu nhập</button>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Ngày</th><th>Diễn giải</th><th>Dòng</th><th>Tổng SL</th><th>Nguồn</th><th>Trạng thái</th><th></th></tr></thead><tbody id="importsTbody"></tbody></table></div>
+        <div class="pager"><button id="importsPrev" class="ghost">Trước</button><span id="importsPage">1</span><button id="importsNext" class="ghost">Sau</button></div>
+      </section>
+
+      <section id="exportsView" class="view">
+        <div class="toolbar wrap">
+          <input id="exportsSearch" class="grow" placeholder="Tìm ngày, số HĐ, mã, tên, diễn giải..." />
+          <input id="exportsDateFrom" type="date" />
+          <input id="exportsDateTo" type="date" />
+          <button id="exportsSearchBtn" class="soft" type="button">Lọc</button>
+          <button id="exportsAddBtn" class="primary admin-staff" type="button">+ Phiếu xuất</button>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Ngày</th><th>Số HĐ</th><th>Diễn giải</th><th>Dòng</th><th>Tổng SL</th><th>Nguồn</th><th></th></tr></thead><tbody id="exportsTbody"></tbody></table></div>
+        <div class="pager"><button id="exportsPrev" class="ghost">Trước</button><span id="exportsPage">1</span><button id="exportsNext" class="ghost">Sau</button></div>
+      </section>
+
+      <section id="nxtView" class="view">
+        <div class="toolbar wrap">
+          <input id="nxtSearch" class="grow" placeholder="Tìm mã hàng / tên hàng..." />
+          <label class="check"><input id="nxtOnlyStock" type="checkbox" /> Còn tồn</label>
+          <label class="check"><input id="nxtOnlyMoved" type="checkbox" /> Có phát sinh</label>
+          <button id="nxtSearchBtn" class="soft" type="button">Lọc</button>
+          <button id="nxtRebuildBtn" class="primary admin-staff" type="button">Tính lại</button>
+          <button id="nxtExportBtn" class="ghost" type="button">Xuất CSV</button>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th>Tồn ĐK</th><th>Nhập</th><th>Xuất</th><th>Điều chỉnh</th><th>Tồn CK</th><th>ĐG USD</th><th>ĐG VND</th></tr></thead><tbody id="nxtTbody"></tbody></table></div>
+        <div class="pager"><button id="nxtPrev" class="ghost">Trước</button><span id="nxtPage">1</span><button id="nxtNext" class="ghost">Sau</button></div>
+      </section>
+
+      <section id="ledgerView" class="view">
+        <div class="toolbar wrap">
+          <input id="ledgerSearch" class="grow" placeholder="Tìm mã, tên, diễn giải, hóa đơn..." />
+          <input id="ledgerDateFrom" type="date" />
+          <input id="ledgerDateTo" type="date" />
+          <button id="ledgerSearchBtn" class="soft" type="button">Lọc</button>
+          <button id="ledgerExportBtn" class="ghost" type="button">Xuất CSV</button>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Ngày</th><th>Loại</th><th>Mã hàng</th><th>Tên hàng</th><th>Bucket</th><th>Hướng</th><th>Số lượng</th><th>Diễn giải</th></tr></thead><tbody id="ledgerTbody"></tbody></table></div>
+        <div class="pager"><button id="ledgerPrev" class="ghost">Trước</button><span id="ledgerPage">1</span><button id="ledgerNext" class="ghost">Sau</button></div>
+      </section>
+
+      <section id="importExcelView" class="view">
+        <div class="panel import-panel">
+          <h3>Import file Excel .xlsb / .xlsx</h3>
+          <p class="muted">Ứng dụng đọc sheet <b>NHAP</b> và <b>XUAT</b>, bỏ qua dòng trống, gửi dữ liệu lên Worker theo lô 500 dòng.</p>
+          <div class="form-grid">
+            <label>Chọn file
+              <input id="excelFileInput" type="file" accept=".xls,.xlsx,.xlsb,.xlsm" />
+            </label>
+            <label>Sheet cần import
+              <select id="excelSheetMode"><option value="BOTH">NHAP + XUAT</option><option value="NHAP">Chỉ NHAP</option><option value="XUAT">Chỉ XUAT</option></select>
+            </label>
+            <label>Dòng dữ liệu bắt đầu
+              <input id="excelStartRow" type="number" min="1" value="10" />
+            </label>
+          </div>
+          <div class="toolbar">
+            <button id="previewExcelBtn" class="soft" type="button">Xem trước</button>
+            <button id="uploadExcelBtn" class="primary" type="button">Import lên D1</button>
+          </div>
+          <div id="importProgress" class="progress hidden"><span></span></div>
+        </div>
+        <div class="panel">
+          <h3>Dữ liệu xem trước</h3>
+          <div class="table-wrap"><table><thead><tr><th>Sheet</th><th>Dòng</th><th>Ngày</th><th>Mã hàng</th><th>Tên hàng</th><th>SL</th><th>Diễn giải</th></tr></thead><tbody id="excelPreviewTbody"></tbody></table></div>
+        </div>
+      </section>
+
+      <section id="periodsView" class="view">
+        <div class="toolbar"><button id="periodsReloadBtn" class="soft" type="button">Tải danh sách kỳ</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Kỳ</th><th>Từ ngày</th><th>Đến ngày</th><th>Trạng thái</th><th>Khóa lúc</th><th>Ghi chú</th><th></th></tr></thead><tbody id="periodsTbody"></tbody></table></div>
+      </section>
+
+      <section id="auditView" class="view">
+        <div class="toolbar wrap"><input id="auditSearch" class="grow" placeholder="Tìm user, hành động, mã hàng..." /><button id="auditSearchBtn" class="soft" type="button">Tìm</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Thời gian</th><th>User</th><th>Hành động</th><th>Bảng</th><th>Kỳ</th><th>Mã hàng</th><th>IP</th></tr></thead><tbody id="auditTbody"></tbody></table></div>
+        <div class="pager"><button id="auditPrev" class="ghost">Trước</button><span id="auditPage">1</span><button id="auditNext" class="ghost">Sau</button></div>
+      </section>
+
+      <section id="usersView" class="view">
+        <div class="toolbar"><button id="userAddBtn" class="primary" type="button">+ Tài khoản</button></div>
+        <div class="table-wrap"><table><thead><tr><th>User</th><th>Tên hiển thị</th><th>Quyền</th><th>Active</th><th>Lần đăng nhập</th><th></th></tr></thead><tbody id="usersTbody"></tbody></table></div>
+      </section>
+    </section>
+  </main>
+
+  <dialog id="productDialog" class="modal">
+    <form id="productForm" method="dialog" class="modal-card">
+      <h3 id="productDialogTitle">Mã hàng</h3>
+      <input type="hidden" id="productId" />
+      <div class="form-grid">
+        <label>Mã hàng <input id="productCode" required /></label>
+        <label>Tên hàng <input id="productName" /></label>
+        <label>ĐVT <input id="productUnit" value="PCS" /></label>
+        <label>Khách hàng <input id="productCustomer" /></label>
+        <label>Nhóm <input id="productGroup" /></label>
+        <label>Trạng thái <select id="productActive"><option value="1">Active</option><option value="0">Ngưng</option></select></label>
+        <label class="span-2">Ghi chú <textarea id="productNote"></textarea></label>
+      </div>
+      <div class="modal-actions"><button class="ghost" type="button" data-close-dialog>Đóng</button><button class="primary" type="submit">Lưu</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="docDialog" class="modal wide">
+    <form id="docForm" method="dialog" class="modal-card">
+      <h3 id="docDialogTitle">Phiếu</h3>
+      <input type="hidden" id="docId" />
+      <input type="hidden" id="docType" />
+      <div class="form-grid">
+        <label>Ngày <input id="docDate" type="date" required /></label>
+        <label>Số chứng từ <input id="docVoucherNo" /></label>
+        <label>Số hóa đơn <input id="docInvoiceNo" /></label>
+        <label>Đối tác <input id="docPartner" /></label>
+        <label class="span-2">Diễn giải <input id="docDescription" /></label>
+        <label class="span-2">Ghi chú <input id="docNote" /></label>
+      </div>
+
+      <div class="line-head">
+        <h4>Dòng hàng</h4>
+        <button id="addDocLineBtn" class="soft" type="button">+ Thêm dòng</button>
+      </div>
+      <div id="docLinesBox" class="doc-lines"></div>
+      <p class="form-help">Có thể nhập số lượng ở từng bucket. Dòng nào tổng số lượng bằng 0 sẽ không lưu.</p>
+
+      <div class="modal-actions"><button class="ghost" type="button" data-close-dialog>Đóng</button><button class="primary" type="submit">Lưu phiếu</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="userDialog" class="modal">
+    <form id="userForm" method="dialog" class="modal-card">
+      <h3 id="userDialogTitle">Tài khoản</h3>
+      <input type="hidden" id="userId" />
+      <div class="form-grid">
+        <label>User <input id="userUsername" required /></label>
+        <label>Tên hiển thị <input id="userDisplayName" /></label>
+        <label>Quyền <select id="userRole"><option value="staff">staff</option><option value="viewer">viewer</option><option value="admin">admin</option></select></label>
+        <label>Active <select id="userActive"><option value="1">Active</option><option value="0">Khóa</option></select></label>
+        <label id="userPasswordWrap" class="span-2">Mật khẩu <input id="userPassword" type="password" /></label>
+      </div>
+      <div class="modal-actions"><button class="ghost" type="button" data-close-dialog>Đóng</button><button class="primary" type="submit">Lưu</button></div>
+    </form>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
