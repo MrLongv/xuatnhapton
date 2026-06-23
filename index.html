@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#f4efe7" />
   <title>Xuất Nhập Tồn</title>
-  <link rel="stylesheet" href="style.css?v=20260623_sltn_v3" />
+  <link rel="stylesheet" href="style.css?v=20260623_price_amount_v1" />
 </head>
 <body>
   <div id="toastHost" class="toast-host" aria-live="polite"></div>
@@ -122,7 +122,7 @@
           <button id="importsSearchBtn" class="soft" type="button">Lọc</button>
           <button id="importsAddBtn" class="primary admin-staff" type="button">+ Phiếu nhập</button>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>Ngày</th><th>Diễn giải</th><th>Dòng</th><th>Tổng SL</th><th>Nguồn</th><th>Trạng thái</th><th></th></tr></thead><tbody id="importsTbody"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>Ngày</th><th>Diễn giải</th><th>Dòng</th><th>Tổng SL</th><th>ĐG USD</th><th>ĐG VND</th><th>TT USD</th><th>TT VND</th><th>Nguồn</th><th>Trạng thái</th><th></th></tr></thead><tbody id="importsTbody"></tbody></table></div>
         <div class="pager"><button id="importsPrev" class="ghost">Trước</button><span id="importsPage">1</span><button id="importsNext" class="ghost">Sau</button></div>
       </section>
 
@@ -134,12 +134,17 @@
           <button id="exportsSearchBtn" class="soft" type="button">Lọc</button>
           <button id="exportsAddBtn" class="primary admin-staff" type="button">+ Phiếu xuất</button>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>Ngày</th><th>Số HĐ</th><th>Diễn giải</th><th>Dòng</th><th>Tổng SL</th><th>Nguồn</th><th></th></tr></thead><tbody id="exportsTbody"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>Ngày</th><th>Số HĐ</th><th>Diễn giải</th><th>Dòng</th><th>Tổng SL</th><th>ĐG USD</th><th>ĐG VND</th><th>TT USD</th><th>TT VND</th><th>Nguồn</th><th></th></tr></thead><tbody id="exportsTbody"></tbody></table></div>
         <div class="pager"><button id="exportsPrev" class="ghost">Trước</button><span id="exportsPage">1</span><button id="exportsNext" class="ghost">Sau</button></div>
       </section>
 
       <section id="nxtView" class="view">
         <div class="toolbar wrap">
+          <select id="nxtScopeSelect" class="scope-select" title="Chế độ xem NXT">
+            <option value="month">Theo tháng</option>
+            <option value="year">Theo năm</option>
+            <option value="all">Tất cả</option>
+          </select>
           <input id="nxtSearch" class="grow" placeholder="Tìm mã hàng / tên hàng..." />
           <label class="check"><input id="nxtOnlyStock" type="checkbox" /> Còn tồn</label>
           <label class="check"><input id="nxtOnlyMoved" type="checkbox" /> Có phát sinh</label>
@@ -147,7 +152,7 @@
           <button id="nxtRebuildBtn" class="primary admin-staff" type="button">Tính lại</button>
           <button id="nxtExportBtn" class="ghost" type="button">Xuất CSV</button>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th>Tồn ĐK</th><th>Nhập</th><th>Xuất</th><th>Điều chỉnh</th><th>Tồn CK</th><th>ĐG USD</th><th>ĐG VND</th></tr></thead><tbody id="nxtTbody"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th>Tồn ĐK</th><th>Nhập</th><th>Xuất</th><th>Điều chỉnh</th><th>Tồn CK</th><th>ĐG USD</th><th>ĐG VND</th><th>TT nhập USD</th><th>TT xuất VND</th></tr></thead><tbody id="nxtTbody"></tbody></table></div>
         <div class="pager"><button id="nxtPrev" class="ghost">Trước</button><span id="nxtPage">1</span><button id="nxtNext" class="ghost">Sau</button></div>
       </section>
 
@@ -159,7 +164,7 @@
           <button id="ledgerSearchBtn" class="soft" type="button">Lọc</button>
           <button id="ledgerExportBtn" class="ghost" type="button">Xuất CSV</button>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>Ngày</th><th>Loại</th><th>Mã hàng</th><th>Tên hàng</th><th>Bucket</th><th>Hướng</th><th>Số lượng</th><th>Diễn giải</th></tr></thead><tbody id="ledgerTbody"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>Ngày</th><th>Loại</th><th>Mã hàng</th><th>Tên hàng</th><th>Bucket</th><th>Hướng</th><th>Số lượng</th><th>ĐG USD</th><th>ĐG VND</th><th>TT USD</th><th>TT VND</th><th>Diễn giải</th></tr></thead><tbody id="ledgerTbody"></tbody></table></div>
         <div class="pager"><button id="ledgerPrev" class="ghost">Trước</button><span id="ledgerPage">1</span><button id="ledgerNext" class="ghost">Sau</button></div>
       </section>
 
@@ -269,6 +274,6 @@
   </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="app.js?v=20260623_sltn_v3"></script>
+  <script src="app.js?v=20260623_price_amount_v1"></script>
 </body>
 </html>
