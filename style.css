@@ -198,3 +198,29 @@ tbody tr:hover { background: #fffbf4; }
 .action-cell { white-space: nowrap; display: flex; gap: 6px; align-items: center; }
 .muted-row { opacity: .72; }
 #productCode:disabled { background: #efe7dc; color: #7a6d61; cursor: not-allowed; }
+
+/* Khóa kỳ thủ công */
+.period-guide-panel {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.period-guide-panel h3 { margin-bottom: 6px; }
+.period-lock-hint {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 13px 14px;
+  background: #fff8ef;
+  color: var(--muted);
+  font-weight: 750;
+  line-height: 1.45;
+}
+.period-lock-hint.success { background: #eaf7f1; border-color: #cceadf; color: var(--success); }
+.period-lock-hint.warn { background: #fff2dc; border-color: #f0ce95; color: var(--warn); }
+.period-lock-hint.danger { background: #ffe8e4; border-color: #f1b7ad; color: var(--danger); }
+.period-guide-actions { grid-column: 1 / -1; margin-bottom: 0; flex-wrap: wrap; }
+@media (max-width: 900px) {
+  .period-guide-panel { grid-template-columns: 1fr; }
+  .period-guide-actions { flex-direction: column; align-items: stretch; }
+}
