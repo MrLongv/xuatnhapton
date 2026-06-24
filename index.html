@@ -110,7 +110,7 @@
           <button id="productSearchBtn" class="soft" type="button">Tìm</button>
           <button id="productAddBtn" class="primary admin-staff" type="button">+ Mã hàng</button>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th>Khách hàng</th><th>Nhóm</th><th>SLTN</th><th>SL</th><th>Mẫu</th><th>TT</th><th></th></tr></thead><tbody id="productsTbody"></tbody></table></div>
+        <div class="table-wrap products-table-wrap"><table><thead><tr><th>Mã hàng</th><th>Thao tác</th><th>Tên hàng</th><th>ĐVT</th><th>Khách hàng</th><th>Nhóm</th><th>SLTN</th><th>SL</th><th>Mẫu</th><th>Phát sinh</th><th>TT</th></tr></thead><tbody id="productsTbody"></tbody></table></div>
         <div class="pager"><button id="productsPrev" class="ghost">Trước</button><span id="productsPage">1</span><button id="productsNext" class="ghost">Sau</button></div>
       </section>
 
@@ -217,6 +217,8 @@
     <form id="productForm" method="dialog" class="modal-card">
       <h3 id="productDialogTitle">Mã hàng</h3>
       <input type="hidden" id="productId" />
+      <input type="hidden" id="productMovementCount" value="0" />
+      <p id="productCodeLockNote" class="form-help hidden">Mã hàng này đã có phát sinh nhập/xuất nên không sửa trực tiếp mã hàng, chỉ sửa thông tin phụ.</p>
       <div class="form-grid">
         <label>Mã hàng <input id="productCode" required /></label>
         <label>Tên hàng <input id="productName" /></label>
@@ -274,6 +276,6 @@
   </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="app.js?v=20260624_logic_excel_v1"></script>
+  <script src="app.js?v=20260624_product_actions_v1"></script>
 </body>
 </html>
