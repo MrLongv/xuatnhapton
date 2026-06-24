@@ -341,23 +341,36 @@ async function loadProducts() {
   try {
     const data = await api(`/api/products${qs({ q: $("productSearch").value.trim(), page: state.pages.products, limit: PAGE_LIMIT })}`);
     $("productsTbody").innerHTML = data.rows.map((r) => `
-      <tr>
-        <td><strong>${esc(r.product_code)}</strong></td><td>${esc(r.product_name)}</td><td>${esc(r.unit)}</td>
+      <tr class="${r.is_active ? "" : "muted-row"}">
+        <td><strong>${esc(r.product_code)}</strong></td>
+        <td class="action-cell">
+          <button class="tiny admin-staff" data-edit-product='${attrJson(r)}'>Sửa</button>
+          ${r.is_active
+            ? `<button class="tiny danger admin-staff" data-toggle-product='${attrJson(r)}'>Ngưng</button>`
+            : `<button class="tiny admin-staff" data-toggle-product='${attrJson(r)}'>Kích hoạt</button>`}
+        </td>
+        <td>${esc(r.product_name)}</td><td>${esc(r.unit)}</td>
         <td>${esc(r.customer_name)}</td><td>${esc(r.item_group)}</td>
         <td class="num strong">${fmt(sltnTotal(r))}</td><td class="num">${fmt(r.sltn_sl)}</td><td class="num">${fmt(r.sltn_mau)}</td>
+        <td class="num">${fmt(r.movement_count)}</td>
         <td><span class="badge ${r.is_active ? "success" : "danger"}">${r.is_active ? "Active" : "Ngưng"}</span></td>
-        <td class="right"><button class="tiny" data-edit-product='${attrJson(r)}'>Sửa</button></td>
-      </tr>`).join("") || emptyRow(10);
+      </tr>`).join("") || emptyRow(11);
     $("productsPage").textContent = data.page;
     setPagerState("products", data);
     $$('[data-edit-product]').forEach((btn) => btn.addEventListener("click", () => openProductDialog(safeJson(btn.dataset.editProduct))));
+    $$('[data-toggle-product]').forEach((btn) => btn.addEventListener("click", () => toggleProductActive(safeJson(btn.dataset.toggleProduct))));
+    applyRoleVisibility();
   } catch (err) { toast(err.message, "error"); }
 }
 
 function openProductDialog(r = null) {
   $("productDialogTitle").textContent = r ? "Sửa mã hàng" : "Thêm mã hàng";
   $("productId").value = r?.id || "";
+  const movementCount = Number(r?.movement_count || 0);
+  $("productMovementCount").value = String(movementCount);
   $("productCode").value = r?.product_code || "";
+  $("productCode").disabled = !!r && movementCount > 0;
+  $("productCodeLockNote")?.classList.toggle("hidden", !(r && movementCount > 0));
   $("productName").value = r?.product_name || "";
   $("productUnit").value = r?.unit || "PCS";
   $("productSltnSl").value = r?.sltn_sl ?? 0;
@@ -368,6 +381,24 @@ function openProductDialog(r = null) {
   $("productNote").value = r?.note || "";
   $("productActive").value = r?.is_active === 0 ? "0" : "1";
   $("productDialog").showModal();
+}
+
+async function toggleProductActive(r) {
+  if (!r?.id) return;
+  const active = Number(r.is_active || 0) === 1;
+  const actionText = active ? "ngưng dùng" : "kích hoạt lại";
+  if (!confirm(`${actionText[0].toUpperCase()}${actionText.slice(1)} mã ${r.product_code}?`)) return;
+  try {
+    if (active) {
+      await api(`/api/products/${encodeURIComponent(r.id)}`, { method: "DELETE" });
+    } else {
+      await api(`/api/products/${encodeURIComponent(r.id)}`, { method: "PUT", body: { is_active: true } });
+    }
+    toast(active ? "Đã chuyển mã hàng sang Ngưng dùng" : "Đã kích hoạt mã hàng", "success");
+    await loadProducts();
+  } catch (err) {
+    toast(err.message, "error");
+  }
 }
 
 
