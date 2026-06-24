@@ -9,7 +9,7 @@ const STORAGE = {
 };
 
 const API_BASE = "https://xuat-nhap-ton-api.lequangthuan1988.workers.dev";
-const APP_VERSION = "20260623-nxt-scope-v1";
+const APP_VERSION = "20260624-logic-excel-v1";
 const PAGE_LIMIT = 50;
 const IMPORT_BATCH_SIZE = 500;
 
@@ -309,6 +309,7 @@ function bindProducts() {
   $("productSearchBtn").addEventListener("click", () => { state.pages.products = 1; loadProducts(); });
   $("productSearch").addEventListener("keydown", (e) => { if (e.key === "Enter") { state.pages.products = 1; loadProducts(); } });
   $("productAddBtn").addEventListener("click", () => openProductDialog());
+  ["productSltnSl", "productSltnMau"].forEach((id) => $(id)?.addEventListener("input", refreshProductSltnTotal));
   bindPager("products", loadProducts);
 
   $("productForm").addEventListener("submit", async (e) => {
@@ -323,9 +324,9 @@ function bindProducts() {
         item_group: $("productGroup").value.trim(),
         note: $("productNote").value.trim(),
         is_active: $("productActive").value === "1",
-        sltn_total: nullableNumber($("productSltnTotal").value) || 0,
         sltn_sl: nullableNumber($("productSltnSl").value) || 0,
         sltn_mau: nullableNumber($("productSltnMau").value) || 0,
+        sltn_total: sltnTotalFromInputs(),
       };
       if (id) await api(`/api/products/${encodeURIComponent(id)}`, { method: "PUT", body: payload });
       else await api("/api/products", { method: "POST", body: payload });
@@ -343,7 +344,7 @@ async function loadProducts() {
       <tr>
         <td><strong>${esc(r.product_code)}</strong></td><td>${esc(r.product_name)}</td><td>${esc(r.unit)}</td>
         <td>${esc(r.customer_name)}</td><td>${esc(r.item_group)}</td>
-        <td class="num strong">${fmt(r.sltn_total)}</td><td class="num">${fmt(r.sltn_sl)}</td><td class="num">${fmt(r.sltn_mau)}</td>
+        <td class="num strong">${fmt(sltnTotal(r))}</td><td class="num">${fmt(r.sltn_sl)}</td><td class="num">${fmt(r.sltn_mau)}</td>
         <td><span class="badge ${r.is_active ? "success" : "danger"}">${r.is_active ? "Active" : "Ngưng"}</span></td>
         <td class="right"><button class="tiny" data-edit-product='${attrJson(r)}'>Sửa</button></td>
       </tr>`).join("") || emptyRow(10);
@@ -359,14 +360,28 @@ function openProductDialog(r = null) {
   $("productCode").value = r?.product_code || "";
   $("productName").value = r?.product_name || "";
   $("productUnit").value = r?.unit || "PCS";
-  $("productSltnTotal").value = r?.sltn_total ?? 0;
   $("productSltnSl").value = r?.sltn_sl ?? 0;
   $("productSltnMau").value = r?.sltn_mau ?? 0;
+  refreshProductSltnTotal();
   $("productCustomer").value = r?.customer_name || "";
   $("productGroup").value = r?.item_group || "";
   $("productNote").value = r?.note || "";
   $("productActive").value = r?.is_active === 0 ? "0" : "1";
   $("productDialog").showModal();
+}
+
+
+function sltnTotal(row) {
+  return Number(row?.sltn_sl || 0) + Number(row?.sltn_mau || 0);
+}
+
+function sltnTotalFromInputs() {
+  return (nullableNumber($("productSltnSl")?.value) || 0) + (nullableNumber($("productSltnMau")?.value) || 0);
+}
+
+function refreshProductSltnTotal() {
+  const input = $("productSltnTotal");
+  if (input) input.value = sltnTotalFromInputs();
 }
 
 // =========================================================
@@ -610,7 +625,7 @@ function bindNxt() {
   $("nxtSearchBtn").addEventListener("click", () => { state.pages.nxt = 1; loadNxt(); });
   $("nxtSearch").addEventListener("keydown", (e) => { if (e.key === "Enter") { state.pages.nxt = 1; loadNxt(); } });
   $("nxtRebuildBtn").addEventListener("click", rebuildNxt);
-  $("nxtExportBtn").addEventListener("click", () => exportCsv(nxtExportFileName(), state.lastRows.nxt));
+  $("nxtExportBtn").addEventListener("click", exportNxtExcel);
   bindPager("nxt", loadNxt);
 }
 
@@ -631,7 +646,7 @@ async function loadNxt() {
     updatePeriodSelectorState();
     $("nxtTbody").innerHTML = data.rows.map((r) => `<tr>
       <td><strong>${esc(r.product_code)}</strong></td><td>${esc(r.product_name)}</td><td>${esc(r.unit)}</td>
-      <td class="num strong">${fmt(r.sltn_total)}</td><td class="num">${fmt(r.sltn_sl)}</td><td class="num">${fmt(r.sltn_mau)}</td>
+      <td class="num strong">${fmt(sltnTotal(r))}</td><td class="num">${fmt(r.sltn_sl)}</td><td class="num">${fmt(r.sltn_mau)}</td>
       <td class="num">${fmt(r.opening_qty)}</td><td class="num good">${fmt(r.import_qty)}</td><td class="num bad">${fmt(r.export_qty)}</td>
       <td class="num">${fmt(r.adjustment_qty)}</td><td class="num strong">${fmt(r.closing_qty)}</td>
       <td class="num">${fmtMoney(r.unit_price_usd, 4)}</td><td class="num">${fmtMoney(r.unit_price_vnd)}</td>
@@ -658,15 +673,77 @@ async function rebuildNxt() {
 
 function nxtExportFileName() {
   const scope = state.nxtScope || "month";
-  if (scope === "all") return "tong_hop_nxt_tat_ca.csv";
-  if (scope === "year") return `tong_hop_nxt_${state.year}.csv`;
-  return `tong_hop_nxt_${periodId()}.csv`;
+  if (scope === "all") return "tong_hop_nxt_tat_ca.xlsx";
+  if (scope === "year") return `tong_hop_nxt_${state.year}.xlsx`;
+  return `tong_hop_nxt_${periodId()}.xlsx`;
+}
+
+async function fetchAllNxtRowsForExport() {
+  const all = [];
+  let page = 1;
+  const limit = 500;
+  while (true) {
+    const data = await api(`/api/nxt${qs({
+      scope: state.nxtScope || "month",
+      year: state.year,
+      month: state.month,
+      q: $("nxtSearch").value.trim(),
+      only_in_stock: $("nxtOnlyStock").checked ? 1 : "",
+      only_moved: $("nxtOnlyMoved").checked ? 1 : "",
+      page,
+      limit,
+    })}`);
+    all.push(...(data.rows || []));
+    if (!data.has_more) break;
+    page++;
+    if (page > 200) throw new Error("Dữ liệu xuất quá lớn, vui lòng lọc lại trước khi xuất Excel");
+  }
+  return all;
+}
+
+async function exportNxtExcel() {
+  try {
+    if (!window.XLSX) throw new Error("Chưa tải được thư viện xuất Excel. Kiểm tra mạng hoặc file xlsx.full.min.js.");
+    setButtonLoading($("nxtExportBtn"), true, "Đang xuất...");
+    const rows = await fetchAllNxtRowsForExport();
+    if (!rows.length) { toast("Không có dữ liệu để xuất", "warn"); return; }
+    const scopeText = state.nxtScope === "all" ? "Tất cả" : (state.nxtScope === "year" ? `Năm ${state.year}` : `Tháng ${state.month}/${state.year}`);
+    exportExcelWorkbook({
+      filename: nxtExportFileName(),
+      sheetName: "Tong hop NXT",
+      title: `TỔNG HỢP XUẤT NHẬP TỒN - ${scopeText}`,
+      columns: [
+        ["Kỳ", "period_id"],
+        ["Mã hàng", "product_code"],
+        ["Tên hàng", "product_name"],
+        ["ĐVT", "unit"],
+        ["Tác nghiệp", (r) => sltnTotal(r)],
+        ["SL", "sltn_sl"],
+        ["Mẫu", "sltn_mau"],
+        ["Tồn đầu kỳ", "opening_qty"],
+        ["Nhập", "import_qty"],
+        ["Xuất", "export_qty"],
+        ["Điều chỉnh", "adjustment_qty"],
+        ["Tồn cuối kỳ", "closing_qty"],
+        ["ĐG USD", "unit_price_usd"],
+        ["ĐG VND", "unit_price_vnd"],
+        ["TT nhập USD", "import_amount_usd"],
+        ["TT xuất VND", "export_amount_vnd"],
+      ],
+      rows,
+    });
+    toast(`Đã xuất ${fmt(rows.length)} dòng ra Excel`, "success");
+  } catch (err) {
+    toast(err.message, "error");
+  } finally {
+    setButtonLoading($("nxtExportBtn"), false);
+  }
 }
 
 function bindLedger() {
   $("ledgerSearchBtn").addEventListener("click", () => { state.pages.ledger = 1; loadLedger(); });
   $("ledgerSearch").addEventListener("keydown", (e) => { if (e.key === "Enter") { state.pages.ledger = 1; loadLedger(); } });
-  $("ledgerExportBtn").addEventListener("click", () => exportCsv("so_phat_sinh.csv", state.lastRows.ledger));
+  $("ledgerExportBtn").addEventListener("click", exportLedgerExcel);
   bindPager("ledger", loadLedger);
 }
 
@@ -711,7 +788,7 @@ async function previewExcel() {
     state.lastRows.excelPreview = rows.slice(0, 200);
     $("excelPreviewTbody").innerHTML = rows.slice(0, 200).map((r) => `<tr>
       <td>${esc(r.source_sheet)}</td><td>${esc(r.source_row)}</td><td>${esc(r.doc_date || "")}</td><td><strong>${esc(r.product_code)}</strong></td>
-      <td>${esc(r.product_name)}</td><td class="num">${fmt(r.kind === "PRODUCT" ? r.sltn_total : r.qty_total)}</td>
+      <td>${esc(r.product_name)}</td><td class="num">${fmt(r.kind === "PRODUCT" ? sltnTotal(r) : r.qty_total)}</td>
       <td class="num">${r.kind === "PRODUCT" ? "" : fmtMoney(r.unit_price_usd, 4)}</td><td class="num">${r.kind === "PRODUCT" ? "" : fmtMoney(r.unit_price_vnd)}</td>
       <td class="num">${r.kind === "PRODUCT" ? "" : fmtMoney(r.amount_usd, 2)}</td><td class="num">${r.kind === "PRODUCT" ? "" : fmtMoney(r.amount_vnd)}</td>
       <td>${esc(r.kind === "PRODUCT" ? ("SL: " + fmt(r.sltn_sl) + " / Mẫu: " + fmt(r.sltn_mau)) : r.description)}</td>
@@ -899,9 +976,9 @@ function parseTongHopProductsSheet(sheet, startRow) {
     if (!productCode || isTotalRow(productCode) || productCode.toUpperCase() === "MÃ HÀNG") continue;
     const productName = clean(r[5]);
     const unit = clean(r[6]) || "PCS";
-    const sltnTotal = num(r[7]);
     const sltnSl = num(r[8]);
     const sltnMau = num(r[9]);
+    const sltnTotal = sltnSl + sltnMau;
     if (!sltnTotal && !sltnSl && !sltnMau && !productName) continue;
     rows.push({
       kind: "PRODUCT",
@@ -956,12 +1033,12 @@ function parseNhapSheetByHeaderRows(a, cfg, startRow) {
       amount_vnd: headerNum(r, map, ["TT VND", "Thành tiền VND", "Thanh tien VND", "Amount VND"]),
       ton_dau_ky_kho: headerNum(r, map, ["Tồn ĐK KHO", "Ton DK KHO", "Opening KHO"]),
       ton_dau_ky_kho_tk: headerNum(r, map, ["Tồn ĐK KHO TK", "Ton DK KHO TK", "Opening KHO TK"]),
-      ton_dau_ky_km: headerNum(r, map, ["Tồn ĐK KM", "Ton DK KM", "Opening KM"]),
+      ton_dau_ky_km: headerNum(r, map, ["Tồn ĐK Khác màu", "Tồn ĐK KM", "Ton DK Khac mau", "Ton DK KM", "Opening KM"]),
       ton_dau_ky_tk: headerNum(r, map, ["Tồn ĐK TK", "Ton DK TK", "Opening TK"]),
       ton_dau_ky_top: headerNum(r, map, ["Tồn ĐK TOP", "Ton DK TOP", "Opening TOP"]),
       nhap_pstk_kho: headerNum(r, map, ["Nhập PSTK KHO", "Nhap PSTK KHO", "Nhập KHO", "Nhap KHO", "Qty KHO"]),
       nhap_pstk_kho_tk: headerNum(r, map, ["Nhập PSTK KHO TK", "Nhap PSTK KHO TK", "Nhập KHO TK", "Nhap KHO TK", "Qty KHO TK"]),
-      nhap_pstk_km: headerNum(r, map, ["Nhập PSTK KM", "Nhap PSTK KM", "Nhập KM", "Nhap KM", "Qty KM"]),
+      nhap_pstk_km: headerNum(r, map, ["Nhập PSTK Khác màu", "Nhập PSTK KM", "Nhap PSTK Khac mau", "Nhap PSTK KM", "Nhập KM", "Nhap KM", "Qty KM"]),
       nhap_pstk_tk: headerNum(r, map, ["Nhập PSTK TK", "Nhap PSTK TK", "Nhập TK", "Nhap TK", "Qty TK"]),
       nhap_pstk_top: headerNum(r, map, ["Nhập PSTK TOP", "Nhap PSTK TOP", "Nhập TOP", "Nhap TOP", "Qty TOP"]),
       raw_json: compactRaw(r),
@@ -1273,6 +1350,7 @@ function setPagerState(kind, data) {
 }
 
 function bucketLabel(code) {
+  if (code === "KM") return "Khác màu / KM";
   const b = state.buckets.find((x) => x.code === code);
   return b?.name || code.replaceAll("_", " ");
 }
@@ -1330,15 +1408,50 @@ function excelDateToIso(v) {
   return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
 }
 
-function exportCsv(filename, rows) {
-  if (!rows || !rows.length) { toast("Không có dữ liệu để xuất", "warn"); return; }
-  const cols = Object.keys(rows[0]);
-  const csv = [cols.join(","), ...rows.map((r) => cols.map((c) => csvCell(r[c])).join(","))].join("\n");
-  const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(a.href);
+function exportLedgerExcel() {
+  if (!state.lastRows.ledger || !state.lastRows.ledger.length) { toast("Không có dữ liệu để xuất", "warn"); return; }
+  exportExcelWorkbook({
+    filename: "so_phat_sinh.xlsx",
+    sheetName: "So phat sinh",
+    title: `SỔ PHÁT SINH NHẬP XUẤT - ${periodId()}`,
+    columns: [
+      ["Ngày", (r) => displayDate(r.doc_date)],
+      ["Loại phiếu", "doc_type"],
+      ["Mã hàng", "product_code"],
+      ["Tên hàng", "product_name"],
+      ["Nhóm", (r) => bucketLabel(r.bucket_code)],
+      ["Hướng", (r) => r.direction === "IN" ? "Nhập" : "Xuất"],
+      ["Số lượng", "quantity"],
+      ["ĐG USD", "unit_price_usd"],
+      ["ĐG VND", "unit_price_vnd"],
+      ["TT USD", "amount_usd"],
+      ["TT VND", "amount_vnd"],
+      ["Diễn giải", "description"],
+    ],
+    rows: state.lastRows.ledger,
+  });
+  toast("Đã xuất sổ phát sinh ra Excel", "success");
 }
-function csvCell(v) { const s = String(v ?? "").replace(/"/g, '""'); return /[",\n]/.test(s) ? `"${s}"` : s; }
+
+function exportExcelWorkbook({ filename, sheetName, title, columns, rows }) {
+  if (!window.XLSX) throw new Error("Chưa tải được thư viện xuất Excel. Kiểm tra mạng hoặc file xlsx.full.min.js.");
+  const header = columns.map(([label]) => label);
+  const body = rows.map((row) => columns.map(([, key]) => typeof key === "function" ? key(row) : row[key]));
+  const aoa = [[title], [`Ngày xuất: ${new Date().toLocaleString("vi-VN")}`], [], header, ...body];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = header.map((h) => ({ wch: Math.min(Math.max(String(h).length + 4, 12), 34) }));
+  ws["!autofilter"] = { ref: `A4:${columnLetter(header.length)}${Math.max(4, body.length + 4)}` };
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31));
+  XLSX.writeFile(wb, filename.endsWith(".xlsx") ? filename : `${filename}.xlsx`);
+}
+
+function columnLetter(n) {
+  let s = "";
+  while (n > 0) {
+    const m = (n - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s || "A";
+}
