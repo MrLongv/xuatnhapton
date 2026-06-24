@@ -192,3 +192,9 @@ tbody tr:hover { background: #fffbf4; }
 
 .scope-select { min-width: 126px; font-weight: 800; }
 .muted-control { opacity: .55; cursor: not-allowed; }
+
+/* Danh mục mã hàng: thao tác rõ ràng hơn */
+.products-table-wrap table { min-width: 1120px; }
+.action-cell { white-space: nowrap; display: flex; gap: 6px; align-items: center; }
+.muted-row { opacity: .72; }
+#productCode:disabled { background: #efe7dc; color: #7a6d61; cursor: not-allowed; }
