@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#f4efe7" />
   <title>Xuất Nhập Tồn</title>
-  <link rel="stylesheet" href="style.css?v=20260623_price_amount_v1" />
+  <link rel="stylesheet" href="style.css?v=20260624_period_lock_manual_v1" />
 </head>
 <body>
   <div id="toastHost" class="toast-host" aria-live="polite"></div>
@@ -196,8 +196,19 @@
       </section>
 
       <section id="periodsView" class="view">
-        <div class="toolbar"><button id="periodsReloadBtn" class="soft" type="button">Tải danh sách kỳ</button></div>
-        <div class="table-wrap"><table><thead><tr><th>Kỳ</th><th>Từ ngày</th><th>Đến ngày</th><th>Trạng thái</th><th>Khóa lúc</th><th>Ghi chú</th><th></th></tr></thead><tbody id="periodsTbody"></tbody></table></div>
+        <div class="panel period-guide-panel">
+          <div>
+            <h3>Khóa kỳ thủ công</h3>
+            <p class="muted">Kỳ chỉ được khóa sau khi đã nhập đủ NHAP/XUAT, tính lại NXT, kiểm tra số liệu và xuất báo cáo. Hệ thống không tự khóa khi hết tháng.</p>
+          </div>
+          <div id="periodLockHint" class="period-lock-hint">Đang kiểm tra kỳ...</div>
+          <div class="toolbar period-guide-actions">
+            <button id="periodsRebuildCurrentBtn" class="primary admin-staff" type="button">Tính lại kỳ đang chọn</button>
+            <button id="periodsOpenNxtBtn" class="ghost" type="button">Xem Tổng hợp NXT</button>
+            <button id="periodsReloadBtn" class="soft" type="button">Tải danh sách kỳ</button>
+          </div>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Kỳ</th><th>Từ ngày</th><th>Đến ngày</th><th>Trạng thái</th><th>Khóa lúc</th><th>Ghi chú</th><th>Thao tác</th></tr></thead><tbody id="periodsTbody"></tbody></table></div>
       </section>
 
       <section id="auditView" class="view">
@@ -276,6 +287,6 @@
   </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="app.js?v=20260624_product_actions_v1"></script>
+  <script src="app.js?v=20260624_period_lock_manual_v1"></script>
 </body>
 </html>
