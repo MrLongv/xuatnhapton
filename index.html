@@ -150,7 +150,7 @@
           <label class="check"><input id="nxtOnlyMoved" type="checkbox" /> Có phát sinh</label>
           <button id="nxtSearchBtn" class="soft" type="button">Lọc</button>
           <button id="nxtRebuildBtn" class="primary admin-staff" type="button">Tính lại</button>
-          <button id="nxtExportBtn" class="ghost" type="button">Xuất CSV</button>
+          <button id="nxtExportBtn" class="ghost" type="button">Xuất Excel</button>
         </div>
         <div class="table-wrap"><table><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th>Tác nghiệp</th><th>SL</th><th>Mẫu</th><th>Tồn ĐK</th><th>Nhập</th><th>Xuất</th><th>Điều chỉnh</th><th>Tồn CK</th><th>ĐG USD</th><th>ĐG VND</th><th>TT nhập USD</th><th>TT xuất VND</th></tr></thead><tbody id="nxtTbody"></tbody></table></div>
         <div class="pager"><button id="nxtPrev" class="ghost">Trước</button><span id="nxtPage">1</span><button id="nxtNext" class="ghost">Sau</button></div>
@@ -162,7 +162,7 @@
           <input id="ledgerDateFrom" type="date" />
           <input id="ledgerDateTo" type="date" />
           <button id="ledgerSearchBtn" class="soft" type="button">Lọc</button>
-          <button id="ledgerExportBtn" class="ghost" type="button">Xuất CSV</button>
+          <button id="ledgerExportBtn" class="ghost" type="button">Xuất Excel</button>
         </div>
         <div class="table-wrap"><table><thead><tr><th>Ngày</th><th>Loại</th><th>Mã hàng</th><th>Tên hàng</th><th>Bucket</th><th>Hướng</th><th>Số lượng</th><th>ĐG USD</th><th>ĐG VND</th><th>TT USD</th><th>TT VND</th><th>Diễn giải</th></tr></thead><tbody id="ledgerTbody"></tbody></table></div>
         <div class="pager"><button id="ledgerPrev" class="ghost">Trước</button><span id="ledgerPage">1</span><button id="ledgerNext" class="ghost">Sau</button></div>
@@ -221,7 +221,7 @@
         <label>Mã hàng <input id="productCode" required /></label>
         <label>Tên hàng <input id="productName" /></label>
         <label>ĐVT <input id="productUnit" value="PCS" /></label>
-        <label>SLTN tổng <input id="productSltnTotal" type="number" step="0.01" min="0" value="0" /></label>
+        <label>SLTN tổng <input id="productSltnTotal" type="number" step="0.01" min="0" value="0" readonly /></label>
         <label>SL tác nghiệp <input id="productSltnSl" type="number" step="0.01" min="0" value="0" /></label>
         <label>Mẫu <input id="productSltnMau" type="number" step="0.01" min="0" value="0" /></label>
         <label>Khách hàng <input id="productCustomer" /></label>
@@ -252,7 +252,7 @@
         <button id="addDocLineBtn" class="soft" type="button">+ Thêm dòng</button>
       </div>
       <div id="docLinesBox" class="doc-lines"></div>
-      <p class="form-help">Có thể nhập số lượng ở từng bucket. Dòng nào tổng số lượng bằng 0 sẽ không lưu.</p>
+      <p class="form-help">Có thể nhập số lượng ở từng nhóm. KM là Khác màu. Dòng nào tổng số lượng bằng 0 sẽ không lưu.</p>
 
       <div class="modal-actions"><button class="ghost" type="button" data-close-dialog>Đóng</button><button class="primary" type="submit">Lưu phiếu</button></div>
     </form>
@@ -274,6 +274,6 @@
   </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="app.js?v=20260623_tacnghiep_price_template_v1"></script>
+  <script src="app.js?v=20260624_logic_excel_v1"></script>
 </body>
 </html>
