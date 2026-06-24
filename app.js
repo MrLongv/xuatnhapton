@@ -9,7 +9,7 @@ const STORAGE = {
 };
 
 const API_BASE = "https://xuat-nhap-ton-api.lequangthuan1988.workers.dev";
-const APP_VERSION = "20260624-logic-excel-v1";
+const APP_VERSION = "20260624-period-lock-manual-v1";
 const PAGE_LIMIT = 50;
 const IMPORT_BATCH_SIZE = 500;
 
@@ -691,15 +691,28 @@ async function loadNxt() {
 async function rebuildNxt() {
   try {
     const scope = state.view === "nxt" ? (state.nxtScope || "month") : "month";
-    if (scope === "all" && !confirm("Tính lại NXT tất cả các kỳ có thể mất lâu hơn. Tiếp tục?")) return;
+    if (scope === "all" && !confirm("Tính lại NXT tất cả các kỳ có thể mất lâu hơn. Các kỳ đã khóa sẽ bị bỏ qua. Tiếp tục?")) return;
     const body = scope === "month"
       ? { scope, period_id: periodId() }
       : { scope, year: state.year };
-    const data = await api("/api/nxt/rebuild", { method: "POST", body });
-    if (scope === "month") toast(`Đã tính lại ${data.period_id}: ${fmt(data.product_rows)} mã hàng`, "success");
-    else toast(`Đã tính lại ${fmt(data.period_count || 0)} kỳ, ${fmt(data.product_rows || 0)} dòng tổng hợp`, "success");
+    await rebuildNxtForScope(body);
     await loadCurrentView();
   } catch (err) { toast(err.message, "error"); }
+}
+
+async function rebuildNxtForScope(body) {
+  const scope = body.scope || "month";
+  const data = await api("/api/nxt/rebuild", { method: "POST", body });
+  if (scope === "month") {
+    toast(`Đã tính lại ${data.period_id}: ${fmt(data.product_rows)} mã hàng`, "success");
+  } else {
+    const skipped = Number(data.skipped_locked || 0);
+    const msg = skipped
+      ? `Đã tính lại ${fmt(data.period_count || 0)} kỳ, bỏ qua ${fmt(skipped)} kỳ đã khóa`
+      : `Đã tính lại ${fmt(data.period_count || 0)} kỳ, ${fmt(data.product_rows || 0)} dòng tổng hợp`;
+    toast(msg, skipped ? "warn" : "success");
+  }
+  return data;
 }
 
 function nxtExportFileName() {
@@ -1237,11 +1250,22 @@ function compactRaw(row) {
 // Periods / Audit / Users
 // =========================================================
 
-function bindPeriods() { $("periodsReloadBtn").addEventListener("click", loadPeriods); }
+function bindPeriods() {
+  $("periodsReloadBtn").addEventListener("click", loadPeriods);
+  $("periodsRebuildCurrentBtn")?.addEventListener("click", rebuildCurrentPeriodFromPeriodsView);
+  $("periodsOpenNxtBtn")?.addEventListener("click", () => setView("nxt"));
+}
 
 async function loadPeriods() {
   try {
     const data = await api(`/api/periods${qs({ year: state.year })}`);
+    const prev = previousPeriodMeta(state.year, state.month);
+    let prevRow = (data.rows || []).find((r) => r.id === prev.id) || null;
+    if (!prevRow && prev.year !== state.year) {
+      const prevData = await api(`/api/periods${qs({ year: prev.year })}`);
+      prevRow = (prevData.rows || []).find((r) => r.id === prev.id) || null;
+    }
+    renderPeriodLockHint(data.rows || [], prevRow);
     $("periodsTbody").innerHTML = data.rows.map((r) => `<tr>
       <td><strong>${esc(r.id)}</strong></td><td>${esc(displayDate(r.start_date))}</td><td>${esc(displayDate(r.end_date))}</td>
       <td><span class="badge ${r.status === "locked" ? "danger" : "success"}">${r.status === "locked" ? "Đã khóa" : "Đang mở"}</span></td>
@@ -1254,14 +1278,56 @@ async function loadPeriods() {
   } catch (err) { toast(err.message, "error"); }
 }
 
+function previousPeriodMeta(year, month) {
+  let y = Number(year);
+  let m = Number(month) - 1;
+  if (m <= 0) { y -= 1; m = 12; }
+  return { year: y, month: m, id: `${y}-${String(m).padStart(2, "0")}` };
+}
+
+function renderPeriodLockHint(rows, prevRow) {
+  const box = $("periodLockHint");
+  if (!box) return;
+  const current = (rows || []).find((r) => r.id === periodId());
+  const role = state.user?.role || "viewer";
+  let cls = "period-lock-hint";
+  let text = `Kỳ đang chọn ${periodId()}: ${current?.status === "locked" ? "đã khóa" : "đang mở"}. `;
+  if (role !== "admin") text += "Chỉ admin có quyền khóa hoặc mở khóa kỳ. ";
+  if (prevRow && prevRow.status !== "locked") {
+    cls += " warn";
+    text += `Gợi ý: kỳ trước ${prevRow.id} chưa khóa. Sau khi kiểm tra NXT và xuất báo cáo, admin nên khóa kỳ này để chốt số liệu.`;
+  } else if (prevRow && prevRow.status === "locked") {
+    cls += " success";
+    text += `Kỳ trước ${prevRow.id} đã khóa. Dữ liệu đã được bảo vệ khỏi sửa trực tiếp.`;
+  } else {
+    cls += current?.status === "locked" ? " success" : " warn";
+    text += "Hãy nhập đủ dữ liệu, tính lại NXT, kiểm tra và khóa thủ công khi đã chốt.";
+  }
+  box.className = cls;
+  box.textContent = text;
+}
+
+async function rebuildCurrentPeriodFromPeriodsView() {
+  try {
+    await rebuildNxtForScope({ scope: "month", period_id: periodId() });
+    await loadPeriods();
+  } catch (err) { toast(err.message, "error"); }
+}
+
 async function lockPeriod(id) {
+  const ok = confirm(`Khóa kỳ ${id}?
+
+Bạn nên chỉ khóa sau khi đã nhập đủ NHAP/XUAT, bấm Tính lại NXT, kiểm tra số liệu và xuất báo cáo Excel. Sau khi khóa, muốn sửa dữ liệu phải mở khóa kỳ trước.`);
+  if (!ok) return;
   const note = prompt(`Ghi chú khóa kỳ ${id}:`, "Đã chốt số liệu");
   if (note === null) return;
   try { await api(`/api/periods/${encodeURIComponent(id)}/lock`, { method: "POST", body: { note } }); toast("Đã khóa kỳ", "success"); loadPeriods(); } catch (err) { toast(err.message, "error"); }
 }
 
 async function unlockPeriod(id) {
-  if (!confirm(`Mở khóa kỳ ${id}?`)) return;
+  if (!confirm(`Mở khóa kỳ ${id}?
+
+Chỉ mở khóa khi cần sửa hoặc nhập bổ sung. Sau khi sửa xong hãy tính lại NXT và khóa lại.`)) return;
   try { await api(`/api/periods/${encodeURIComponent(id)}/unlock`, { method: "POST", body: {} }); toast("Đã mở khóa kỳ", "success"); loadPeriods(); } catch (err) { toast(err.message, "error"); }
 }
 
